@@ -1,0 +1,179 @@
+/* Actividad.css */
+
+.actividad-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.actividad-header-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.last-updated {
+  font-size: 0.875rem;
+  color: #9ca3af;
+}
+
+/* Grid de KPIs */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+  gap: 1.5rem;
+}
+
+@media (min-width: 640px) {
+  .kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .kpi-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.kpi-card {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.kpi-icon-wrapper {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+}
+
+.kpi-icon-wrapper.bg-blue { background-color: rgba(59, 130, 246, 0.2); color: var(--color-secondary); }
+.kpi-icon-wrapper.bg-green { background-color: rgba(34, 197, 94, 0.2); color: var(--color-success); }
+.kpi-icon-wrapper.bg-yellow { background-color: rgba(245, 94, 11, 0.2); color: var(--color-warning); }
+.kpi-icon-wrapper.bg-red { background-color: rgba(239, 68, 68, 0.2); color: var(--color-danger); }
+
+.kpi-info h3 {
+  font-size: 0.875rem;
+  color: #9ca3af;
+  margin: 0;
+}
+
+.kpi-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #fff;
+  margin: 0.25rem 0;
+}
+
+.kpi-subtext {
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+/* Tabla de Actividad */
+.user-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.user-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background-color: #3b82f6;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+.gps-count {
+  background-color: rgba(255, 255, 255, 0.05);
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  color: #d1d5db;
+}
+
+/* Alert Badges */
+.alerts-cell {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.alert-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.alert-badge.warning {
+  background-color: rgba(245, 158, 11, 0.1);
+  color: var(--color-warning);
+}
+
+.alert-badge.danger {
+  background-color: rgba(239, 68, 68, 0.1);
+  color: var(--color-danger);
+}
+
+.alert-badge.success {
+  background-color: rgba(34, 197, 94, 0.1);
+  color: var(--color-success);
+}
+
+/* Status Badges Específicos */
+.status-badge.sin-marcar {
+  background-color: rgba(156, 163, 175, 0.1);
+  color: var(--color-text-muted);
+}
+
+.status-badge.presente {
+  background-color: rgba(34, 197, 94, 0.1);
+  color: var(--color-success);
+}
+
+.status-badge.en-break {
+  background-color: rgba(245, 158, 11, 0.1);
+  color: var(--color-warning);
+}
+
+.status-badge.salida {
+  background-color: rgba(59, 130, 246, 0.1);
+  color: var(--color-secondary);
+}
+
+.status-badge.observado {
+  background-color: rgba(239, 68, 68, 0.1);
+  color: var(--color-danger);
+}
+
+.flex { display: flex; }
+.items-center { align-items: center; }
+.gap-2 { gap: 0.5rem; }
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}

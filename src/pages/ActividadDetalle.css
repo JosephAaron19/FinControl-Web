@@ -1,0 +1,140 @@
+.detalle-container {
+  padding: 1rem 0;
+}
+
+.detalle-content-grid {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+}
+
+@media (max-width: 1024px) {
+  .detalle-content-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Jornada Times */
+.jornada-times {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+  padding: 1.5rem;
+}
+
+.time-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.75rem;
+  background-color: var(--bg-color);
+  border-radius: var(--border-radius-md);
+  border: 1px solid var(--border-color);
+}
+
+.time-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.time-value {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-color);
+}
+
+/* Incidencias */
+.incidencias-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.5rem;
+}
+
+.incidencia-item {
+  padding: 1rem;
+  border-radius: var(--border-radius-md);
+  border-left: 4px solid;
+}
+
+.incidencia-item.pendiente {
+  background-color: #fef3c7;
+  border-color: var(--warning-color);
+}
+
+.incidencia-item.resuelto {
+  background-color: #d1fae5;
+  border-color: var(--success-color);
+}
+
+.incidencia-item.atendiendo {
+  background-color: #dbeafe;
+  border-color: var(--secondary-color);
+}
+
+.incidencia-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.incidencia-tipo {
+  font-weight: 600;
+  color: var(--text-color);
+}
+
+.incidencia-hora {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.incidencia-desc {
+  font-size: 0.9rem;
+  color: var(--text-color);
+}
+
+/* Scrollable Table */
+.max-h-600 {
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+/* Row Alert */
+.row-alert {
+  background-color: #fef2f2 !important;
+}
+
+.row-alert:hover {
+  background-color: #fee2e2 !important;
+}
+
+/* Badges */
+.badge-count {
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  padding: 0.25rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border: 1px solid var(--border-color);
+}
+
+.status-badge.valid {
+  background-color: #d1fae5;
+  color: #065f46;
+}
+
+.alert-banner {
+  padding: 0.5rem 1rem;
+  border-radius: var(--border-radius-md);
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.alert-banner.warning {
+  background-color: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fcd34d;
+}

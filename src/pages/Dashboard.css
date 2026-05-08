@@ -1,0 +1,107 @@
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1.5rem;
+}
+
+.stat-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 1.25rem;
+  padding: 1.5rem;
+}
+
+.stat-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stat-icon.users {
+  background-color: rgba(59, 130, 246, 0.1);
+  color: var(--color-secondary);
+}
+
+.stat-icon.activity {
+  background-color: rgba(16, 185, 129, 0.1);
+  color: var(--color-primary);
+}
+
+.stat-details h3 {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  margin-bottom: 0.25rem;
+  margin-top: 0;
+}
+
+.stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 0.25rem;
+  margin-top: 0;
+}
+
+.stat-trend {
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.stat-trend.positive {
+  color: var(--color-success);
+}
+
+.recent-activity {
+  flex: 1;
+}
+
+.recent-activity h2 {
+  font-size: 1.1rem;
+  margin-bottom: 1.5rem;
+  margin-top: 0;
+}
+
+.activity-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.activity-item {
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.activity-item:last-child {
+  border-bottom: none;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.status-badge.valid {
+  background-color: rgba(16, 185, 129, 0.1);
+  color: var(--color-success);
+}
+
+.status-badge.invalid {
+  background-color: rgba(239, 68, 68, 0.1);
+  color: var(--color-danger);
+}
+
+.empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-muted);
+}
