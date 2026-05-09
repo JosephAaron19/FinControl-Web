@@ -4,7 +4,8 @@ import { Plus, Edit2, Trash2, MapPin, X } from 'lucide-react';
 import MainLayout from '../layouts/MainLayout';
 import './Sedes.css';
 
-const API_URL = 'http://localhost:8000/api';
+const API_URL = import.meta.env.VITE_API_URL || 'https://apifincontrol.finatech.com.pe/api';
+
 
 const Sedes = () => {
   const navigate = useNavigate();
