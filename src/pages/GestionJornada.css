@@ -1,0 +1,25 @@
+.input-field {
+  background-color: #1e293b !important;
+  color: #ffffff !important;
+  border: 1px solid #475569 !important;
+  border-radius: 0.5rem !important;
+  padding: 0.75rem 1rem !important;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Asegurar que el picker de hora sea visible */
+input[type="time"].input-field {
+  color-scheme: dark; /* Esto ayuda a que el ícono del reloj y el popup se adapten a fondo oscuro */
+  color: #ffffff !important;
+}
+
+/* Si es un select */
+select.input-field {
+  color: #ffffff !important;
+}
+
+select.input-field option {
+  background-color: #1e293b;
+  color: #ffffff;
+}

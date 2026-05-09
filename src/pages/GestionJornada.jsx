@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { Plus, Edit2, Trash2, Calendar, X } from 'lucide-react';
 import MainLayout from '../layouts/MainLayout';
 import './Sedes.css'; // Reutilizamos estilos de sedes para consistencia
+import './GestionJornada.css';
+
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://apifincontrol.finatech.com.pe/api';
 
