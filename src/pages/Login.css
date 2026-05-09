@@ -142,3 +142,23 @@
   color: var(--color-text-muted);
   font-size: 0.875rem;
 }
+
+.password-toggle {
+  position: absolute;
+  right: 1rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  padding: 0;
+  display: flex;
+  align-items: center;
+}
+
+.password-toggle:hover {
+  color: var(--color-primary);
+}
+
+.input-field.with-right-icon {
+  padding-right: 3rem;
+}

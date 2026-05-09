@@ -11,6 +11,8 @@ const Usuarios = () => {
   const [usuarios, setUsuarios] = useState([]);
   const [userProfile, setUserProfile] = useState(null);
   const [sedes, setSedes] = useState([]);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showModalPassword, setShowModalPassword] = useState(false);
   const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(true);
   
@@ -466,15 +468,25 @@ const Usuarios = () => {
               {!currentUsuario && (
                 <div className="form-group">
                   <label>Contraseña Temporal *</label>
-                  <input 
-                    type="password" 
-                    name="password"
-                    value={formData.password} 
-                    onChange={handleInputChange} 
-                    required={!currentUsuario}
-                    className="input-field"
-                    placeholder="Asigna una contraseña inicial"
-                  />
+                  <div className="password-input-wrapper" style={{ position: 'relative' }}>
+                    <input 
+                      type={showPassword ? "text" : "password"} 
+                      name="password"
+                      value={formData.password} 
+                      onChange={handleInputChange} 
+                      required={!currentUsuario}
+                      className="input-field"
+                      placeholder="Asigna una contraseña inicial"
+                      style={{ paddingRight: '40px' }}
+                    />
+                    <button 
+                      type="button" 
+                      onClick={() => setShowPassword(!showPassword)}
+                      style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
+                    >
+                      {showPassword ? 'Ocultar' : 'Ver'}
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -560,17 +572,7 @@ const Usuarios = () => {
                   </label>
                 </div>
                 
-                <div className="form-group checkbox-group">
-                  <label className="checkbox-label">
-                    <input 
-                      type="checkbox" 
-                      name="debe_cambiar_password"
-                      checked={formData.debe_cambiar_password} 
-                      onChange={handleInputChange} 
-                    />
-                    <span>Forzar cambio de contraseña al ingresar</span>
-                  </label>
-                </div>
+
               </div>
 
               <div className="modal-footer">
@@ -604,27 +606,25 @@ const Usuarios = () => {
               
               <div className="form-group">
                 <label>Nueva Contraseña Temporal *</label>
-                <input 
-                  type="password" 
-                  name="password"
-                  value={passwordData.password} 
-                  onChange={handlePasswordInputChange} 
-                  required 
-                  className="input-field"
-                  placeholder="Ingrese la nueva contraseña"
-                />
-              </div>
-
-              <div className="form-group checkbox-group">
-                <label className="checkbox-label">
+                <div className="password-input-wrapper" style={{ position: 'relative' }}>
                   <input 
-                    type="checkbox" 
-                    name="debe_cambiar_password"
-                    checked={passwordData.debe_cambiar_password} 
+                    type={showModalPassword ? "text" : "password"} 
+                    name="password"
+                    value={passwordData.password} 
                     onChange={handlePasswordInputChange} 
+                    required 
+                    className="input-field"
+                    placeholder="Ingrese la nueva contraseña"
+                    style={{ paddingRight: '40px' }}
                   />
-                  <span>Forzar cambio de contraseña al ingresar</span>
-                </label>
+                  <button 
+                    type="button" 
+                    onClick={() => setShowModalPassword(!showModalPassword)}
+                    style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
+                  >
+                    {showModalPassword ? 'Ocultar' : 'Ver'}
+                  </button>
+                </div>
               </div>
 
               <div className="modal-footer">

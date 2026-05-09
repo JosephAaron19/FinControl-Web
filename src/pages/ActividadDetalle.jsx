@@ -218,15 +218,15 @@ const ActividadDetalle = () => {
                         <tr key={p.id} className={p.es_fuera_de_zona ? 'row-alert' : ''}>
                           <td>{formatTime(p.fecha_hora)}</td>
                           <td className="text-sm">
-                            {p.latitud.toFixed(5)}, {p.longitud.toFixed(5)}
+                            {p.latitud?.toFixed(5) || 'N/A'}, {p.longitud?.toFixed(5) || 'N/A'}
                           </td>
                           <td>
                             <div className="flex items-center gap-1">
                               <Battery size={14} />
-                              {p.bateria_porcentaje}%
+                              {p.bateria_porcentaje ?? '-'}%
                             </div>
                           </td>
-                          <td>{p.precision_metros.toFixed(1)} m</td>
+                          <td>{p.precision_metros?.toFixed(1) || '-'} m</td>
                           <td>
                             <span className={`status-badge ${p.es_fuera_de_zona ? 'invalid' : 'valid'}`}>
                               {p.es_fuera_de_zona ? 'Fuera Zona' : 'OK'}
