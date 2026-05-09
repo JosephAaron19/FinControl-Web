@@ -9,6 +9,7 @@ const API_URL = import.meta.env.VITE_API_URL;
 const Usuarios = () => {
   const navigate = useNavigate();
   const [usuarios, setUsuarios] = useState([]);
+  const [userProfile, setUserProfile] = useState(null);
   const [sedes, setSedes] = useState([]);
   const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -88,7 +89,25 @@ const Usuarios = () => {
     }
   };
 
+  const fetchProfile = async () => {
+    const token = localStorage.getItem('access_token');
+    if (!token) return;
+
+    try {
+      const res = await fetch(`${API_URL}/auth/profile/`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setUserProfile(data);
+      }
+    } catch (err) {
+      console.error('Error fetching profile:', err);
+    }
+  };
+
   useEffect(() => {
+    fetchProfile();
     fetchData();
   }, [navigate]);
 
@@ -276,6 +295,7 @@ const Usuarios = () => {
     <MainLayout 
       title="Gestión de Usuarios" 
       subtitle="Administra los accesos, roles y sedes de los trabajadores."
+      userName={userProfile?.nombre_completo || "Usuario"}
     >
       <div className="usuarios-container card">
         

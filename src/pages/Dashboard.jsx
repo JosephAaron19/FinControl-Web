@@ -4,11 +4,31 @@ import { Users, Activity } from 'lucide-react';
 import MainLayout from '../layouts/MainLayout';
 import './Dashboard.css';
 
+const API_URL = import.meta.env.VITE_API_URL;
+
 const Dashboard = () => {
   const navigate = useNavigate();
   const [stats, setStats] = useState({ usuarios: 0, transacciones: 0 });
+  const [userProfile, setUserProfile] = useState(null);
   const [recentActivity, setRecentActivity] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  const fetchProfile = async () => {
+    const token = localStorage.getItem('access_token');
+    if (!token) return;
+
+    try {
+      const res = await fetch(`${API_URL}/auth/profile/`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setUserProfile(data);
+      }
+    } catch (err) {
+      console.error('Error fetching profile:', err);
+    }
+  };
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -22,11 +42,11 @@ const Dashboard = () => {
         const headers = { Authorization: `Bearer ${token}` };
         
         // Fetch usuarios
-        const userRes = await fetch('http://localhost:8000/api/usuarios/', { headers });
+        const userRes = await fetch(`${API_URL}/usuarios/`, { headers });
         const users = await userRes.json();
         
         // Fetch asistencias
-        const asisRes = await fetch('http://localhost:8000/api/asistencias/', { headers });
+        const asisRes = await fetch(`${API_URL}/asistencias/`, { headers });
         const asistencias = await asisRes.json();
         
         setStats({
@@ -43,6 +63,7 @@ const Dashboard = () => {
       }
     };
 
+    fetchProfile();
     fetchDashboardData();
   }, [navigate]);
 
@@ -50,6 +71,7 @@ const Dashboard = () => {
     <MainLayout 
       title="Resumen General" 
       subtitle="Bienvenido al panel de administración."
+      userName={userProfile?.nombre_completo || "Usuario"}
     >
       {/* Stats Cards */}
       <div className="stats-grid">
