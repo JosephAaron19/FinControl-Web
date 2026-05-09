@@ -5,6 +5,7 @@ import Sedes from './pages/Sedes';
 import Usuarios from './pages/Usuarios';
 import Actividad from './pages/Actividad';
 import ActividadDetalle from './pages/ActividadDetalle';
+import GestionJornada from './pages/GestionJornada';
 
 function App() {
   return (
@@ -14,6 +15,7 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/sedes" element={<Sedes />} />
+          <Route path="/jornada" element={<GestionJornada />} />
           <Route path="/usuarios" element={<Usuarios />} />
           <Route path="/actividad" element={<Actividad />} />
           <Route path="/actividad/:id" element={<ActividadDetalle />} />

@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LogOut, LayoutDashboard, Users, Activity, Settings, MapPin } from 'lucide-react';
+import { LogOut, LayoutDashboard, Users, Activity, Settings, MapPin, Calendar } from 'lucide-react';
 import './Sidebar.css';
 
 const Sidebar = () => {
@@ -34,6 +34,10 @@ const Sidebar = () => {
         <NavLink to="/actividad" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
           <Activity size={20} />
           <span>Actividad</span>
+        </NavLink>
+        <NavLink to="/jornada" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+          <Calendar size={20} />
+          <span>Gestión de Jornada</span>
         </NavLink>
         <a href="#" className="nav-item">
           <Settings size={20} />
