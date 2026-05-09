@@ -4,7 +4,7 @@ import { Plus, Edit2, Trash2, Calendar, X } from 'lucide-react';
 import MainLayout from '../layouts/MainLayout';
 import './Sedes.css'; // Reutilizamos estilos de sedes para consistencia
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+const API_URL = import.meta.env.VITE_API_URL || 'https://apifincontrol.finatech.com.pe/api';
 
 const GestionJornada = () => {
   const navigate = useNavigate();
