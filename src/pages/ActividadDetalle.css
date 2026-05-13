@@ -121,9 +121,24 @@
   border: 1px solid var(--border-color);
 }
 
-.status-badge.valid {
-  background-color: #d1fae5;
-  color: #065f46;
+.status-badge.valid, .status-badge.puntual {
+  background-color: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+}
+
+.status-badge.tardanza {
+  background-color: rgba(245, 158, 11, 0.1);
+  color: #f59e0b;
+}
+
+.status-badge.observado, .status-badge.invalid, .status-badge.no-marcó-entrada, .status-badge.no_marco_entrada {
+  background-color: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+}
+
+.status-badge.justificado {
+  background-color: rgba(16, 185, 129, 0.1);
+  color: #10b981;
 }
 
 .alert-banner {

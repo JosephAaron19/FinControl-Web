@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { User, Clock, AlertTriangle, MapPin, CheckCircle, ArrowLeft, Battery, Crosshair, Wifi } from 'lucide-react';
 import MainLayout from '../layouts/MainLayout';
+import useWebSockets from '../hooks/useWebSockets';
 import './ActividadDetalle.css';
 
 const API_URL = import.meta.env.VITE_API_URL;
@@ -37,6 +38,16 @@ const ActividadDetalle = () => {
       setLoading(false);
     }
   };
+
+  const onSocketMessage = (data) => {
+    // Si la actualización es para este usuario o es una actualización de configuración
+    if (data.notification_type === 'attendance_update' || data.notification_type === 'config_update') {
+      console.log('Notificación recibida en detalle, actualizando...');
+      fetchDetalle();
+    }
+  };
+
+  useWebSockets(onSocketMessage);
 
   useEffect(() => {
     fetchDetalle();

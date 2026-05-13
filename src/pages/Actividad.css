@@ -145,7 +145,7 @@
   color: var(--color-text-muted);
 }
 
-.status-badge.presente {
+.status-badge.presente, .status-badge.puntual {
   background-color: rgba(34, 197, 94, 0.1);
   color: var(--color-success);
 }
@@ -163,6 +163,21 @@
 .status-badge.observado {
   background-color: rgba(239, 68, 68, 0.1);
   color: var(--color-danger);
+}
+
+.status-badge.tardanza {
+  background-color: rgba(245, 158, 11, 0.1);
+  color: var(--color-warning);
+}
+
+.status-badge.no-marcó-entrada, .status-badge.no_marco_entrada {
+  background-color: rgba(239, 68, 68, 0.1);
+  color: var(--color-danger);
+}
+
+.status-badge.justificado {
+  background-color: rgba(16, 185, 129, 0.1);
+  color: #10b981;
 }
 
 .flex { display: flex; }

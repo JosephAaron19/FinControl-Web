@@ -21,6 +21,8 @@ const GestionJornada = () => {
     dia_semana: 'lunes',
     hora_inicio_marcacion: '08:00:00',
     hora_fin_marcacion: '09:00:00',
+    hora_inicio_salida: '17:00:00',
+    hora_fin_salida: '19:00:00',
     activo: true,
     observacion: ''
   });
@@ -85,6 +87,8 @@ const GestionJornada = () => {
         dia_semana: config.dia_semana,
         hora_inicio_marcacion: config.hora_inicio_marcacion,
         hora_fin_marcacion: config.hora_fin_marcacion,
+        hora_inicio_salida: config.hora_inicio_salida || '17:00:00',
+        hora_fin_salida: config.hora_fin_salida || '19:00:00',
         activo: config.activo,
         observacion: config.observacion || ''
       });
@@ -95,6 +99,8 @@ const GestionJornada = () => {
         dia_semana: 'lunes',
         hora_inicio_marcacion: '08:00:00',
         hora_fin_marcacion: '09:00:00',
+        hora_inicio_salida: '17:00:00',
+        hora_fin_salida: '19:00:00',
         activo: true,
         observacion: ''
       });
@@ -125,6 +131,13 @@ const GestionJornada = () => {
       
     const method = currentConfig ? 'PUT' : 'POST';
 
+    const dataToSend = {
+      ...formData,
+      hora_inicio_salida: formData.hora_inicio_salida || null,
+      hora_fin_salida: formData.hora_fin_salida || null,
+      observacion: formData.observacion || null
+    };
+
     try {
       const res = await fetch(url, {
         method,
@@ -132,7 +145,7 @@ const GestionJornada = () => {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}` 
          },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(dataToSend)
       });
 
       if (res.ok) {
@@ -203,8 +216,8 @@ const GestionJornada = () => {
                 <tr>
                   <th>Sede</th>
                   <th>Día</th>
-                  <th>Hora Inicio</th>
-                  <th>Hora Fin</th>
+                  <th>Rango Entrada</th>
+                  <th>Rango Salida</th>
                   <th>Estado</th>
                   <th>Acciones</th>
                 </tr>
@@ -216,8 +229,8 @@ const GestionJornada = () => {
                       <div className="font-semibold">{getSedeNombre(config.sede)}</div>
                     </td>
                     <td className="capitalize">{config.dia_semana}</td>
-                    <td>{config.hora_inicio_marcacion}</td>
-                    <td>{config.hora_fin_marcacion}</td>
+                    <td>{config.hora_inicio_marcacion} - {config.hora_fin_marcacion}</td>
+                    <td>{config.hora_inicio_salida || '-'} - {config.hora_fin_salida || '-'}</td>
                     <td>
                       <span className={`status-badge ${config.activo ? 'valid' : 'invalid'}`}>
                         {config.activo ? 'Activo' : 'Inactivo'}
@@ -306,13 +319,38 @@ const GestionJornada = () => {
                   />
                 </div>
                 <div className="form-group">
-                  <label>Hora Fin Marcación</label>
+                  <label>Hora Fin Marcación (Puntual)</label>
                   <input 
                     type="time" 
                     name="hora_fin_marcacion"
                     value={formData.hora_fin_marcacion} 
                     onChange={handleInputChange} 
                     required 
+                    className="input-field"
+                    step="1"
+                  />
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Hora Inicio Salida</label>
+                  <input 
+                    type="time" 
+                    name="hora_inicio_salida"
+                    value={formData.hora_inicio_salida} 
+                    onChange={handleInputChange} 
+                    className="input-field"
+                    step="1"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Hora Fin Salida</label>
+                  <input 
+                    type="time" 
+                    name="hora_fin_salida"
+                    value={formData.hora_fin_salida} 
+                    onChange={handleInputChange} 
                     className="input-field"
                     step="1"
                   />

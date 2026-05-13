@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User, Clock, AlertTriangle, MapPin, CheckCircle, XCircle, RefreshCw, Coffee, Eye } from 'lucide-react';
 import MainLayout from '../layouts/MainLayout';
+import useWebSockets from '../hooks/useWebSockets';
 import './Actividad.css';
 
 const API_URL = import.meta.env.VITE_API_URL;
@@ -54,11 +55,22 @@ const Actividad = () => {
     }
   };
 
+  const onSocketMessage = (data) => {
+    if (data.notification_type === 'attendance_update' || data.notification_type === 'config_update') {
+      console.log('Notificación recibida, actualizando datos...');
+      fetchActividad();
+    }
+  };
+
+  useWebSockets(onSocketMessage);
+
   useEffect(() => {
     fetchProfile();
     fetchActividad();
-    // Auto-refresh cada 30 segundos
-    const interval = setInterval(fetchActividad, 30000);
+    
+    // Auto-refresh cada 2 minutos como backup
+    const interval = setInterval(fetchActividad, 120000);
+    
     return () => clearInterval(interval);
   }, [navigate]);
 
