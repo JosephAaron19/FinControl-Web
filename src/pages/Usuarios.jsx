@@ -449,6 +449,7 @@ const Usuarios = () => {
                     disabled={!!currentUsuario}
                     className="input-field"
                     placeholder="Ej. 12345678"
+                    maxLength={8}
                   />
                 </div>
                 <div className="form-group">
@@ -503,7 +504,7 @@ const Usuarios = () => {
                   />
                 </div>
                 <div className="form-group">
-                  <label>Teléfono</label>
+                  <label>Celular</label>
                   <input 
                     type="text" 
                     name="telefono"
@@ -511,6 +512,7 @@ const Usuarios = () => {
                     onChange={handleInputChange} 
                     className="input-field"
                     placeholder="Ej. 987654321"
+                    maxLength={9}
                   />
                 </div>
               </div>

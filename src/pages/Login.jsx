@@ -60,16 +60,17 @@ const Login = () => {
         <div className="card login-card">
           <form onSubmit={handleLogin}>
             <div className="form-group">
-              <label className="input-label" htmlFor="email">Correo Electrónico</label>
+              <label className="input-label" htmlFor="email">Usuario</label>
               <div className="input-wrapper">
                 <Mail className="input-icon" size={20} />
                 <input
                   id="email"
                   type="text"
                   className="input-field with-icon"
-                  placeholder="admin / DNI"
+                  placeholder="Ingrese su DNI"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  maxLength={8}
                   required
                 />
               </div>

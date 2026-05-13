@@ -41,7 +41,7 @@ const ActividadDetalle = () => {
 
   const onSocketMessage = (data) => {
     // Si la actualización es para este usuario o es una actualización de configuración
-    if (data.notification_type === 'attendance_update' || data.notification_type === 'config_update') {
+    if (data.type === 'attendance_update' || data.type === 'config_update') {
       console.log('Notificación recibida en detalle, actualizando...');
       fetchDetalle();
     }

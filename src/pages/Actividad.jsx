@@ -56,7 +56,7 @@ const Actividad = () => {
   };
 
   const onSocketMessage = (data) => {
-    if (data.notification_type === 'attendance_update' || data.notification_type === 'config_update') {
+    if (data.type === 'attendance_update' || data.type === 'config_update') {
       console.log('Notificación recibida, actualizando datos...');
       fetchActividad();
     }
