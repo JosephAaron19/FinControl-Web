@@ -101,16 +101,6 @@ const Actividad = () => {
     >
       <div className="actividad-container">
         
-        {/* Barra Superior con botón de refresco */}
-        <div className="actividad-header-actions">
-          <div className="last-updated">
-            {lastUpdated && `Última actualización: ${lastUpdated.toLocaleTimeString()}`}
-          </div>
-          <button className="btn btn-secondary flex items-center gap-2" onClick={fetchActividad} disabled={loading}>
-            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-            Actualizar
-          </button>
-        </div>
 
         {/* Tarjetas de Resumen (KPIs) - Ocultar para Operadores */}
         {!isOperador && (

@@ -60,18 +60,18 @@
 }
 
 .incidencia-item.pendiente {
-  background-color: #fef3c7;
-  border-color: var(--warning-color);
+  background-color: rgba(245, 158, 11, 0.15);
+  border-color: #f59e0b;
 }
 
 .incidencia-item.resuelto {
-  background-color: #d1fae5;
-  border-color: var(--success-color);
+  background-color: rgba(16, 185, 129, 0.15);
+  border-color: #10b981;
 }
 
 .incidencia-item.atendiendo {
-  background-color: #dbeafe;
-  border-color: var(--secondary-color);
+  background-color: rgba(59, 130, 246, 0.15);
+  border-color: #3b82f6;
 }
 
 .incidencia-header {
@@ -93,6 +93,61 @@
 .incidencia-desc {
   font-size: 0.9rem;
   color: var(--text-color);
+  margin-bottom: 0.75rem;
+}
+
+.incidencia-thumbnail {
+  width: 100%;
+  max-width: 120px;
+  height: 80px;
+  object-fit: cover;
+  border-radius: var(--border-radius-sm);
+  cursor: pointer;
+  border: 1px solid var(--border-color);
+  transition: transform 0.2s;
+}
+
+.incidencia-thumbnail:hover {
+  transform: scale(1.05);
+  filter: brightness(1.1);
+}
+
+/* Modal Visor de Imágenes */
+.image-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(5px);
+}
+
+.image-modal-content {
+  position: relative;
+  max-width: 90%;
+  max-height: 90%;
+}
+
+.image-modal-close {
+  position: absolute;
+  top: -40px;
+  right: 0;
+  color: white;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.image-modal-img {
+  max-width: 100%;
+  max-height: 80vh;
+  border-radius: var(--border-radius-md);
+  box-shadow: 0 0 30px rgba(0, 0, 0, 0.5);
 }
 
 /* Scrollable Table */

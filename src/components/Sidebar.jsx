@@ -39,10 +39,10 @@ const Sidebar = () => {
           <Calendar size={20} />
           <span>Gestión de Jornada</span>
         </NavLink>
-        <a href="#" className="nav-item">
+        <NavLink to="/historial-jornadas" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
           <Settings size={20} />
-          <span>Configuración</span>
-        </a>
+          <span>Historial de Jornadas</span>
+        </NavLink>
       </nav>
 
       <div className="sidebar-footer">

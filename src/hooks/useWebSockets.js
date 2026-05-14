@@ -3,6 +3,12 @@ import { useEffect, useRef, useCallback } from 'react';
 const useWebSockets = (onMessageReceived) => {
     const socketRef = useRef(null);
     const reconnectTimeoutRef = useRef(null);
+    const callbackRef = useRef(onMessageReceived);
+
+    // Actualizar el ref de la función callback sin disparar reconexión
+    useEffect(() => {
+        callbackRef.current = onMessageReceived;
+    }, [onMessageReceived]);
 
     const connect = useCallback(() => {
         const token = localStorage.getItem('access_token');
@@ -20,14 +26,18 @@ const useWebSockets = (onMessageReceived) => {
         };
 
         socket.onmessage = (event) => {
-            const data = JSON.parse(event.data);
-            if (onMessageReceived) {
-                onMessageReceived(data);
+            try {
+                const data = JSON.parse(event.data);
+                if (callbackRef.current) {
+                    callbackRef.current(data);
+                }
+            } catch (err) {
+                console.error('Error parseando mensaje WS:', err);
             }
         };
 
         socket.onclose = () => {
-            console.log('WebSocket Desconectado. Reintentando...');
+            console.log('WebSocket Desconectado. Reintentando en 5s...');
             reconnectTimeoutRef.current = setTimeout(connect, 5000);
         };
 
@@ -37,12 +47,13 @@ const useWebSockets = (onMessageReceived) => {
         };
 
         socketRef.current = socket;
-    }, [onMessageReceived]);
+    }, []); // Ya no depende de onMessageReceived
 
     useEffect(() => {
         connect();
         return () => {
             if (socketRef.current) {
+                socketRef.current.onclose = null; // Evitar reconexión al desmontar
                 socketRef.current.close();
             }
             if (reconnectTimeoutRef.current) {

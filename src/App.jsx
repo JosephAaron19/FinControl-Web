@@ -6,6 +6,7 @@ import Usuarios from './pages/Usuarios';
 import Actividad from './pages/Actividad';
 import ActividadDetalle from './pages/ActividadDetalle';
 import GestionJornada from './pages/GestionJornada';
+import HistorialJornadas from './pages/HistorialJornadas';
 
 function App() {
   return (
@@ -19,6 +20,7 @@ function App() {
           <Route path="/usuarios" element={<Usuarios />} />
           <Route path="/actividad" element={<Actividad />} />
           <Route path="/actividad/:id" element={<ActividadDetalle />} />
+          <Route path="/historial-jornadas" element={<HistorialJornadas />} />
           {/* Default redirect to login for now */}
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>

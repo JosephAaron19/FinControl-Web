@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { User, Clock, AlertTriangle, MapPin, CheckCircle, ArrowLeft, Battery, Crosshair, Wifi } from 'lucide-react';
+import { User, Clock, AlertTriangle, MapPin, CheckCircle, ArrowLeft, Battery, Crosshair, Wifi, X } from 'lucide-react';
 import MainLayout from '../layouts/MainLayout';
 import useWebSockets from '../hooks/useWebSockets';
 import './ActividadDetalle.css';
@@ -12,6 +12,7 @@ const ActividadDetalle = () => {
   const navigate = useNavigate();
   const [detalle, setDetalle] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [selectedImage, setSelectedImage] = useState(null);
 
   const fetchDetalle = async () => {
     const token = localStorage.getItem('access_token');
@@ -195,6 +196,17 @@ const ActividadDetalle = () => {
                         <span className="incidencia-hora">{formatTime(inc.fecha_hora_reporte)}</span>
                       </div>
                       <p className="incidencia-desc">{inc.descripcion}</p>
+                      
+                      {inc.foto && (
+                        <div className="incidencia-foto-wrapper">
+                          <img 
+                            src={inc.foto.startsWith('http') ? inc.foto : `${API_URL.replace('/api', '')}${inc.foto}`} 
+                            alt="Evidencia" 
+                            className="incidencia-thumbnail"
+                            onClick={() => setSelectedImage(inc.foto.startsWith('http') ? inc.foto : `${API_URL.replace('/api', '')}${inc.foto}`)}
+                          />
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -253,6 +265,18 @@ const ActividadDetalle = () => {
           </div>
         </div>
       </div>
+
+      {/* Visor de Imágenes (Modal) */}
+      {selectedImage && (
+        <div className="image-modal-overlay" onClick={() => setSelectedImage(null)}>
+          <div className="image-modal-content" onClick={e => e.stopPropagation()}>
+            <button className="image-modal-close" onClick={() => setSelectedImage(null)}>
+              <X size={24} />
+            </button>
+            <img src={selectedImage} alt="Evidencia Full" className="image-modal-img" />
+          </div>
+        </div>
+      )}
     </MainLayout>
   );
 };

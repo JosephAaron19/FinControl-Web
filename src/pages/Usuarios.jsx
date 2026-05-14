@@ -297,24 +297,29 @@ const Usuarios = () => {
     <MainLayout 
       title="Gestión de Usuarios" 
       subtitle="Administra los accesos, roles y sedes de los trabajadores."
-      userName={userProfile?.nombre_completo || "Usuario"}
     >
       <div className="usuarios-container card">
         
-        {/* Barra de Filtros */}
-        <div className="filters-bar">
-          <div className="search-group">
-            <Search size={18} className="search-icon" />
-            <input 
-              type="text" 
-              placeholder="Buscar por nombre, DNI, cargo o correo..." 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="input-field search-input"
-            />
+        {/* Barra de Filtros en Dos Filas */}
+        <div className="filters-container">
+          <div className="filters-top-row">
+            <div className="search-group">
+              <Search size={18} className="search-icon" />
+              <input 
+                type="text" 
+                placeholder="Buscar por nombre, DNI, cargo o correo..." 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="input-field search-input"
+              />
+            </div>
+            <button className="btn btn-primary btn-add-user" onClick={() => handleOpenModal()}>
+              <Plus size={20} />
+              <span>Nuevo Usuario</span>
+            </button>
           </div>
           
-          <div className="dropdowns-group">
+          <div className="filters-bottom-row">
             <div className="filter-select-wrapper">
               <Building size={16} className="select-icon" />
               <select value={filterSede} onChange={(e) => setFilterSede(e.target.value)} className="input-field filter-select">
@@ -343,11 +348,6 @@ const Usuarios = () => {
                 <option value="false">Inactivos</option>
               </select>
             </div>
-
-            <button className="btn btn-primary" onClick={() => handleOpenModal()}>
-              <Plus size={20} />
-              Nuevo Usuario
-            </button>
           </div>
         </div>
 
