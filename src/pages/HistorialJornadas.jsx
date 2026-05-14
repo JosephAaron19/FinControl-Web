@@ -435,21 +435,7 @@ const HistorialJornadas = () => {
                     )}
                   </div>
                   
-                  <div className="card map-placeholder-card">
-                    <div className="map-header">
-                      <h2>Ubicación Final</h2>
-                      <MapPin size={20} className="text-primary" />
-                    </div>
-                    <div className="mini-map-mock">
-                      <div className="mock-map-bg">
-                        <MapPin size={40} className="pulse-pin" />
-                      </div>
-                      <p>Seguimiento de ruta completado</p>
-                      <button className="btn-primary" onClick={() => navigate(`/actividad/usuario/${jornadaDetalle.id}`)}>
-                        Ver Ruta en Mapa Interactivo
-                      </button>
-                    </div>
-                  </div>
+
                 </div>
               </div>
             )}

@@ -10,7 +10,7 @@ import {
   ChevronRight,
   PlusCircle,
   FileText,
-  Settings
+  Calendar
 } from 'lucide-react';
 import MainLayout from '../layouts/MainLayout';
 import './Dashboard.css';
@@ -180,9 +180,9 @@ const Dashboard = () => {
                 <div className="action-icon"><FileText /></div>
                 <span>Reportes</span>
               </button>
-              <button onClick={() => navigate('/gestion-jornada')} className="action-item">
-                <div className="action-icon"><Settings /></div>
-                <span>Configuración</span>
+              <button onClick={() => navigate('/jornada')} className="action-item">
+                <div className="action-icon"><Calendar /></div>
+                <span>Jornadas</span>
               </button>
             </div>
           </div>
