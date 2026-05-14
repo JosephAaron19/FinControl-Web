@@ -46,7 +46,7 @@ const HistorialJornadas = () => {
       if (filters.fecha_inicio) queryParams.append('fecha_inicio', filters.fecha_inicio);
       if (filters.fecha_fin) queryParams.append('fecha_fin', filters.fecha_fin);
 
-      const res = await fetch(`${API_URL}/jornadas/historial/?${queryParams.toString()}`, {
+      const res = await fetch(`${API_URL}/historial-jornadas/?${queryParams.toString()}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {
@@ -65,7 +65,7 @@ const HistorialJornadas = () => {
     setLoadingDetail(true);
     const token = localStorage.getItem('access_token');
     try {
-      const res = await fetch(`${API_URL}/jornadas/historial/${jornadaId}/`, {
+      const res = await fetch(`${API_URL}/historial-jornadas/${jornadaId}/detalle/`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {
@@ -259,6 +259,8 @@ const HistorialJornadas = () => {
                         <th>Entrada</th>
                         <th>Salida</th>
                         <th>Horas</th>
+                        <th>Incidencias</th>
+                        <th>GPS</th>
                         <th>Estado</th>
                         <th>Acción</th>
                       </tr>
@@ -270,6 +272,16 @@ const HistorialJornadas = () => {
                           <td>{formatTime(item.hora_entrada)}</td>
                           <td>{formatTime(item.hora_salida)}</td>
                           <td><span className="duration-tag">{formatDuration(item.total_horas_trabajadas)}</span></td>
+                          <td className="text-center">
+                            {item.total_incidencias > 0 ? (
+                              <span className="count-badge danger">{item.total_incidencias}</span>
+                            ) : '-'}
+                          </td>
+                          <td className="text-center">
+                            {item.total_puntos_gps > 0 ? (
+                              <span className="count-badge info">{item.total_puntos_gps}</span>
+                            ) : '-'}
+                          </td>
                           <td><span className={`status-badge ${item.estado_jornada?.toLowerCase() || 'completada'}`}>{item.estado_jornada || 'Completada'}</span></td>
                           <td><ChevronRight size={18} /></td>
                         </tr>
@@ -303,11 +315,11 @@ const HistorialJornadas = () => {
                         <Calendar size={24} />
                         <div>
                           <h3>{new Date(jornadaDetalle.fecha + 'T00:00:00').toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</h3>
-                          <p>{jornadaDetalle.usuario.nombre_completo}</p>
+                          <p>{jornadaDetalle.operador} - {jornadaDetalle.sede}</p>
                         </div>
                       </div>
-                      <span className={`status-badge large ${jornadaDetalle.resumen.estado.toLowerCase()}`}>
-                        {jornadaDetalle.resumen.estado}
+                      <span className={`status-badge large ${jornadaDetalle.estado_jornada?.toLowerCase()}`}>
+                        {jornadaDetalle.estado_jornada}
                       </span>
                     </div>
                     
@@ -316,28 +328,28 @@ const HistorialJornadas = () => {
                         <Clock size={20} className="text-success" />
                         <div className="metric-val">
                           <span>Entrada</span>
-                          <strong>{formatTime(jornadaDetalle.resumen.hora_entrada)}</strong>
+                          <strong>{formatTime(jornadaDetalle.hora_entrada)}</strong>
                         </div>
                       </div>
                       <div className="metric-item">
                         <Clock size={20} className="text-danger" />
                         <div className="metric-val">
                           <span>Salida</span>
-                          <strong>{formatTime(jornadaDetalle.resumen.hora_salida)}</strong>
+                          <strong>{formatTime(jornadaDetalle.hora_salida)}</strong>
                         </div>
                       </div>
                       <div className="metric-item">
                         <Activity size={20} />
                         <div className="metric-val">
-                          <span>Total Horas</span>
-                          <strong>{formatDuration(jornadaDetalle.resumen.total_horas)}</strong>
+                          <span>Horas Trabajadas</span>
+                          <strong>{formatDuration(jornadaDetalle.total_horas_trabajadas)}</strong>
                         </div>
                       </div>
                       <div className="metric-item">
                         <Clock size={20} className="text-warning" />
                         <div className="metric-val">
-                          <span>Descanso</span>
-                          <strong>{formatDuration(jornadaDetalle.resumen.total_break)}</strong>
+                          <span>Total Descanso</span>
+                          <strong>{formatDuration(jornadaDetalle.total_tiempo_break)}</strong>
                         </div>
                       </div>
                     </div>
@@ -376,13 +388,13 @@ const HistorialJornadas = () => {
                           </tr>
                         </thead>
                         <tbody>
-                          {[...jornadaDetalle.gps].reverse().map((p, idx) => (
-                            <tr key={idx} className={p.fuera_de_zona ? 'row-alert' : ''}>
-                              <td>{formatTime(p.hora)}</td>
-                              <td>{p.lat.toFixed(5)}, {p.lng.toFixed(5)}</td>
+                          {[...jornadaDetalle.puntos_gps].reverse().map((p, idx) => (
+                            <tr key={idx} className={p.es_fuera_de_zona ? 'row-alert' : ''}>
+                              <td>{formatTime(p.fecha_hora)}</td>
+                              <td>{parseFloat(p.latitud).toFixed(5)}, {parseFloat(p.longitud).toFixed(5)}</td>
                               <td>
-                                <span className={`status-badge small ${p.fuera_de_zona ? 'invalid' : 'valid'}`}>
-                                  {p.fuera_de_zona ? 'Fuera' : 'OK'}
+                                <span className={`status-badge small ${p.es_fuera_de_zona ? 'invalid' : 'valid'}`}>
+                                  {p.es_fuera_de_zona ? 'Fuera' : 'OK'}
                                 </span>
                               </td>
                             </tr>
@@ -433,7 +445,7 @@ const HistorialJornadas = () => {
                         <MapPin size={40} className="pulse-pin" />
                       </div>
                       <p>Seguimiento de ruta completado</p>
-                      <button className="btn-primary" onClick={() => navigate(`/actividad/${jornadaDetalle.usuario.id}`)}>
+                      <button className="btn-primary" onClick={() => navigate(`/actividad/usuario/${jornadaDetalle.id}`)}>
                         Ver Ruta en Mapa Interactivo
                       </button>
                     </div>
