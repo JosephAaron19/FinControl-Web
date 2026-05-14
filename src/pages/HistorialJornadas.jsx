@@ -318,8 +318,8 @@ const HistorialJornadas = () => {
                           <p>{jornadaDetalle.operador} - {jornadaDetalle.sede}</p>
                         </div>
                       </div>
-                      <span className={`status-badge large ${jornadaDetalle.estado_jornada?.toLowerCase()}`}>
-                        {jornadaDetalle.estado_jornada}
+                      <span className={`status-badge large ${jornadaDetalle.estado_jornada?.toLowerCase() || 'completada'}`}>
+                        {jornadaDetalle.estado_jornada || 'Completada'}
                       </span>
                     </div>
                     
@@ -358,13 +358,13 @@ const HistorialJornadas = () => {
                   <div className="card events-timeline-card">
                     <h2>Cronología de la Jornada</h2>
                     <div className="timeline-v2">
-                      {jornadaDetalle.eventos.map((evt, idx) => (
+                      {jornadaDetalle.eventos?.map((evt, idx) => (
                         <div key={idx} className="timeline-v2-item">
-                          <div className="time-col">{formatTime(evt.hora)}</div>
-                          <div className="marker-col"><div className={`marker-dot ${evt.tipo.toLowerCase()}`}></div></div>
+                          <div className="time-col">{formatTime(evt.fecha_hora)}</div>
+                          <div className="marker-col"><div className={`marker-dot ${(evt.tipo_evento || 'info').toLowerCase()}`}></div></div>
                           <div className="content-col">
-                            <h4>{evt.tipo.replace(/_/g, ' ')}</h4>
-                            {evt.distancia > 0 && <p className="text-sm text-muted">A {evt.distancia.toFixed(0)}m de la sede</p>}
+                            <h4>{(evt.tipo_evento || 'Evento').replace(/_/g, ' ')}</h4>
+                            {evt.distancia_sede_metros > 0 && <p className="text-sm text-muted">A {parseFloat(evt.distancia_sede_metros).toFixed(0)}m de la sede</p>}
                             {evt.es_fuera_de_zona && <span className="warning-pill">Fuera de Zona</span>}
                           </div>
                         </div>
@@ -376,7 +376,7 @@ const HistorialJornadas = () => {
                   <div className="card gps-points-card">
                     <div className="card-header-flex">
                       <h2>Recorrido GPS (Puntos Registrados)</h2>
-                      <span className="badge-count">{jornadaDetalle.gps.length} puntos</span>
+                      <span className="badge-count">{jornadaDetalle.puntos_gps?.length || 0} puntos</span>
                     </div>
                     <div className="table-responsive max-h-400">
                       <table className="data-table small">
@@ -388,7 +388,7 @@ const HistorialJornadas = () => {
                           </tr>
                         </thead>
                         <tbody>
-                          {[...jornadaDetalle.puntos_gps].reverse().map((p, idx) => (
+                          {[...(jornadaDetalle.puntos_gps || [])].reverse().map((p, idx) => (
                             <tr key={idx} className={p.es_fuera_de_zona ? 'row-alert' : ''}>
                               <td>{formatTime(p.fecha_hora)}</td>
                               <td>{parseFloat(p.latitud).toFixed(5)}, {parseFloat(p.longitud).toFixed(5)}</td>
@@ -411,11 +411,11 @@ const HistorialJornadas = () => {
                     <h2>Reportes e Incidencias</h2>
                     {jornadaDetalle.incidencias.length > 0 ? (
                       <div className="incidents-stack">
-                        {jornadaDetalle.incidencias.map((inc, idx) => (
+                        {jornadaDetalle.incidencias?.map((inc, idx) => (
                           <div key={idx} className="incident-card-v2">
                             <div className="inc-header">
-                              <strong>{inc.tipo}</strong>
-                              <span className="inc-time">{formatTime(inc.hora)}</span>
+                              <strong>{inc.tipo_incidencia_0?.nombre || 'Incidencia'}</strong>
+                              <span className="inc-time">{formatTime(inc.fecha_hora_reporte)}</span>
                             </div>
                             <p>{inc.descripcion}</p>
                             {inc.foto && (
