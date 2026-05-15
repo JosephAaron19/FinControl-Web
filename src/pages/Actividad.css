@@ -192,3 +192,82 @@
 .animate-spin {
   animation: spin 1s linear infinite;
 }
+
+/* Nuevos Estilos para Asesores */
+.time-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.time-stack span {
+  font-family: monospace;
+  font-size: 0.8rem;
+}
+
+.actividad-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-width: 200px;
+}
+
+.actividad-current {
+  display: flex;
+  flex-direction: column;
+  background: rgba(168, 85, 247, 0.1);
+  border-left: 3px solid #a855f7;
+  padding: 0.4rem 0.6rem;
+  border-radius: 4px;
+}
+
+.actividad-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  color: #a855f7;
+  font-weight: 700;
+}
+
+.actividad-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.actividad-time {
+  font-size: 0.75rem;
+  color: #d1d5db;
+}
+
+.actividad-total {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #94a3b8;
+  padding-left: 0.5rem;
+}
+
+.role-badge.mini {
+  padding: 0.1rem 0.4rem;
+  font-size: 0.65rem;
+}
+
+/* Badge Asesor */
+.role-badge.asesor {
+  background-color: rgba(168, 85, 247, 0.1);
+  color: #a855f7;
+  border: 1px solid rgba(168, 85, 247, 0.2);
+}
+
+.role-badge.operador {
+  background-color: rgba(34, 197, 94, 0.1);
+  color: var(--color-success);
+  border: 1px solid rgba(34, 197, 94, 0.2);
+}
+
+.status-badge.actividad-en-proceso {
+  background-color: rgba(168, 85, 247, 0.1);
+  color: #a855f7;
+}

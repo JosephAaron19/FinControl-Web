@@ -534,9 +534,18 @@ const Usuarios = () => {
                   <label>Rol *</label>
                   <select name="rol" value={formData.rol} onChange={handleInputChange} required className="input-field">
                     <option value="">Seleccione un Rol</option>
-                    {roles.map(rol => (
-                      <option key={rol.id} value={rol.id}>{rol.nombre}</option>
-                    ))}
+                    {roles
+                      .filter(rol => {
+                        const userRole = userProfile?.rol_info?.codigo;
+                        if (userRole === 'SUPERADMIN') return true;
+                        if (userRole === 'GERENTE') {
+                          return ['OPERADOR', 'ASESOR'].includes(rol.codigo);
+                        }
+                        return false;
+                      })
+                      .map(rol => (
+                        <option key={rol.id} value={rol.id}>{rol.nombre}</option>
+                      ))}
                   </select>
                 </div>
                 <div className="form-group">

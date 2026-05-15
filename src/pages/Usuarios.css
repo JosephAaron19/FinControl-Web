@@ -115,7 +115,8 @@
   text-transform: uppercase;
 }
 
-.role-badge.admin {
+.role-badge.admin,
+.role-badge.superadmin {
   background-color: rgba(239, 68, 68, 0.1);
   color: var(--color-danger);
   border: 1px solid rgba(239, 68, 68, 0.2);
@@ -127,10 +128,17 @@
   border: 1px solid rgba(34, 197, 94, 0.2);
 }
 
-.role-badge.supervisor {
+.role-badge.supervisor,
+.role-badge.gerente {
   background-color: rgba(59, 130, 246, 0.1);
   color: var(--color-secondary);
   border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.role-badge.asesor {
+  background-color: rgba(168, 85, 247, 0.1);
+  color: #a855f7;
+  border: 1px solid rgba(168, 85, 247, 0.2);
 }
 
 /* Modales */

@@ -76,15 +76,19 @@ const Actividad = () => {
 
   // Determinar rol
   const rolNombre = userProfile?.rol_info?.nombre?.toLowerCase() || '';
-  const isOperador = rolNombre.includes('operador');
-  const isGerente = rolNombre.includes('gerente') || rolNombre.includes('supervisor');
-  const isSuperadmin = rolNombre.includes('superadmin');
+  const rolCodigo = userProfile?.rol_info?.codigo || '';
+  const isOperador = rolCodigo === 'OPERADOR';
+  const isAsesor = rolCodigo === 'ASESOR';
+  const isOperativo = isOperador || isAsesor;
+  const isGerente = rolCodigo === 'GERENTE' || rolCodigo === 'SUPERVISOR';
+  const isSuperadmin = rolCodigo === 'SUPERADMIN';
 
   // Cálculos para las tarjetas de resumen
-  const totalOperadores = actividades.length;
+  const totalOperativos = actividades.length;
   const activosHoy = actividades.filter(a => a.estado !== 'Sin Marcar').length;
   const sinMarcar = actividades.filter(a => a.estado === 'Sin Marcar').length;
   const enBreak = actividades.filter(a => a.estado === 'En Break').length;
+  const enActividad = actividades.filter(a => a.actividad_actual).length;
   const fueraDeZona = actividades.filter(a => a.fuera_de_zona).length;
   const conIncidencias = actividades.filter(a => a.incidencias > 0).length;
 
@@ -97,21 +101,21 @@ const Actividad = () => {
   return (
     <MainLayout 
       title="Monitoreo de Actividad" 
-      subtitle={isOperador ? "Tu actividad del día de hoy." : "Estado de los operadores en tiempo real para el día de hoy."}
+      subtitle={isOperativo ? "Tu actividad del día de hoy." : "Estado de los operativos en tiempo real para el día de hoy."}
     >
       <div className="actividad-container">
         
 
         {/* Tarjetas de Resumen (KPIs) - Ocultar para Operadores */}
-        {!isOperador && (
+        {!isOperativo && (
           <div className="kpi-grid">
             <div className="kpi-card">
               <div className="kpi-icon-wrapper bg-blue">
                 <User size={24} />
               </div>
               <div className="kpi-info">
-                <h3>Total Operadores</h3>
-                <p className="kpi-value">{totalOperadores}</p>
+                <h3>Total Personal</h3>
+                <p className="kpi-value">{totalOperativos}</p>
               </div>
             </div>
 
@@ -131,8 +135,9 @@ const Actividad = () => {
                 <Coffee size={24} />
               </div>
               <div className="kpi-info">
-                <h3>En Break</h3>
+                <h3>En Descanso</h3>
                 <p className="kpi-value">{enBreak}</p>
+                <span className="kpi-subtext">{enActividad} en actividad</span>
               </div>
             </div>
 
@@ -152,7 +157,7 @@ const Actividad = () => {
         {/* Tabla de Actividad */}
         <div className="actividad-table-wrapper card">
           <div className="card-header">
-            <h2>{isOperador ? "Mi Actividad" : "Detalle de Operadores"}</h2>
+            <h2>{isOperativo ? "Mi Actividad" : "Detalle de Actividad"}</h2>
           </div>
 
           {loading && actividades.length === 0 ? (
@@ -160,19 +165,19 @@ const Actividad = () => {
           ) : actividades.length === 0 ? (
             <div className="empty-state">
               <User size={48} className="empty-icon" />
-              <p>{isOperador ? "No tienes actividad registrada hoy." : "No hay operadores registrados o activos hoy."}</p>
+              <p>{isOperativo ? "No tienes actividad registrada hoy." : "No hay personal registrado o activo hoy."}</p>
             </div>
           ) : (
             <div className="table-responsive">
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>Operador</th>
+                    <th>Usuario</th>
+                    <th>Rol</th>
                     <th>Sede</th>
-                    <th>Entrada</th>
-                    <th>Break</th>
-                    <th>Salida</th>
-                    <th>Puntos GPS</th>
+                    <th>Marcaciones</th>
+                    <th>Actividad Actual</th>
+                    <th>GPS</th>
                     <th>Estado</th>
                     <th>Alertas</th>
                     <th>Acciones</th>
@@ -192,14 +197,43 @@ const Actividad = () => {
                           </div>
                         </div>
                       </td>
-                      <td>{user.sede}</td>
-                      <td>{formatTime(user.hora_entrada)}</td>
                       <td>
-                        {user.hora_inicio_break ? (
-                          <span>{formatTime(user.hora_inicio_break)} - {formatTime(user.hora_fin_break)}</span>
-                        ) : '-'}
+                        <span className={`role-badge mini ${user.rol_codigo?.toLowerCase()}`}>
+                          {user.rol_nombre || '-'}
+                        </span>
                       </td>
-                      <td>{formatTime(user.hora_salida)}</td>
+                      <td>{user.sede}</td>
+                      <td>
+                        <div className="time-stack">
+                          <span title="Entrada">E: {formatTime(user.hora_entrada)}</span>
+                          {user.hora_inicio_break && (
+                            <span title="Break" className="text-xs text-warning">
+                              B: {formatTime(user.hora_inicio_break)}
+                            </span>
+                          )}
+                          <span title="Salida">S: {formatTime(user.hora_salida)}</span>
+                        </div>
+                      </td>
+                      <td>
+                        {user.rol_codigo === 'ASESOR' ? (
+                          <div className="actividad-cell">
+                            {user.actividad_actual ? (
+                              <div className="actividad-current">
+                                <span className="actividad-label">En proceso:</span>
+                                <span className="actividad-name">{user.actividad_actual.tipo_nombre}</span>
+                                <span className="actividad-time">{formatTime(user.actividad_actual.hora_inicio)}</span>
+                              </div>
+                            ) : (
+                              <span className="text-muted text-xs">Sin actividad en proceso</span>
+                            )}
+                            <div className="actividad-total">
+                              Total: {user.total_actividades || 0}
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-muted">-</span>
+                        )}
+                      </td>
                       <td>
                         <span className="gps-count">
                           {user.puntos_gps} pts

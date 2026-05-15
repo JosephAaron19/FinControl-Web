@@ -316,6 +316,9 @@ const HistorialJornadas = () => {
                         <div>
                           <h3>{new Date(jornadaDetalle.fecha + 'T00:00:00').toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</h3>
                           <p>{jornadaDetalle.operador} - {jornadaDetalle.sede}</p>
+                          <span className={`role-badge mini ${jornadaDetalle.rol_codigo?.toLowerCase()}`}>
+                            {jornadaDetalle.rol_nombre || '-'}
+                          </span>
                         </div>
                       </div>
                       <span className={`status-badge large ${jornadaDetalle.estado_jornada?.toLowerCase() || 'completada'}`}>
@@ -356,7 +359,7 @@ const HistorialJornadas = () => {
                   </div>
 
                   <div className="card events-timeline-card">
-                    <h2>Cronología de la Jornada</h2>
+                    <h2>Cronología de la Jornada (Marcaciones)</h2>
                     <div className="timeline-v2">
                       {jornadaDetalle.eventos?.map((evt, idx) => (
                         <div key={idx} className="timeline-v2-item">
@@ -372,7 +375,74 @@ const HistorialJornadas = () => {
                     </div>
                   </div>
 
-                  {/* GPS Points Table */}
+                  {/* Field Activities for Advisors */}
+                  {jornadaDetalle.rol_codigo === 'ASESOR' && (
+                    <div className="card activities-history-card">
+                      <div className="card-header-flex">
+                        <h2>Actividades de Campo</h2>
+                        <span className="badge-count">{jornadaDetalle.actividades_campo?.length || 0}</span>
+                      </div>
+                      
+                      {(!jornadaDetalle.actividades_campo || jornadaDetalle.actividades_campo.length === 0) ? (
+                        <p className="empty-msg">No se registraron actividades de campo en esta jornada.</p>
+                      ) : (
+                        <div className="timeline-v2">
+                          {jornadaDetalle.actividades_campo.map((act, idx) => (
+                            <div key={idx} className="timeline-v2-item activity-history-item">
+                              <div className="time-col">
+                                {formatTime(act.hora_inicio_actividad)}
+                                <br />
+                                <span className="text-xs text-muted">
+                                  {act.hora_fin_actividad ? formatTime(act.hora_fin_actividad) : '...'}
+                                </span>
+                              </div>
+                              <div className="marker-col">
+                                <div className={`marker-dot ${act.estado_actividad?.toLowerCase() === 'finalizada' ? 'success' : 'warning'}`}></div>
+                              </div>
+                              <div className="content-col">
+                                <div className="flex justify-between items-start">
+                                  <div>
+                                    <span className="act-type-tag">{act.tipo_actividad}</span>
+                                    <h4>{act.titulo}</h4>
+                                  </div>
+                                  <span className={`status-badge small ${act.estado_actividad?.toLowerCase()}`}>
+                                    {act.estado_actividad}
+                                  </span>
+                                </div>
+                                <p className="text-sm mt-2">{act.descripcion}</p>
+                                <div className="act-meta mt-2">
+                                  <span><strong>Cliente:</strong> {act.cliente_nombre}</span>
+                                  <span><strong>Resultado:</strong> {act.resultado_actividad || '-'}</span>
+                                </div>
+                                
+                                {(act.evidencia_inicio_url || act.evidencia_fin_url) && (
+                                  <div className="act-evidence mt-3">
+                                    {act.evidencia_inicio_url && (
+                                      <img 
+                                        src={act.evidencia_inicio_url.startsWith('http') ? act.evidencia_inicio_url : `${API_URL.replace('/api', '')}${act.evidencia_inicio_url}`} 
+                                        alt="Evidencia Inicio" 
+                                        className="evidence-thumb"
+                                        onClick={() => window.open(act.evidencia_inicio_url.startsWith('http') ? act.evidencia_inicio_url : `${API_URL.replace('/api', '')}${act.evidencia_inicio_url}`, '_blank')}
+                                      />
+                                    )}
+                                    {act.evidencia_fin_url && (
+                                      <img 
+                                        src={act.evidencia_fin_url.startsWith('http') ? act.evidencia_fin_url : `${API_URL.replace('/api', '')}${act.evidencia_fin_url}`} 
+                                        alt="Evidencia Fin" 
+                                        className="evidence-thumb"
+                                        onClick={() => window.open(act.evidencia_fin_url.startsWith('http') ? act.evidencia_fin_url : `${API_URL.replace('/api', '')}${act.evidencia_fin_url}`, '_blank')}
+                                      />
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <div className="card gps-points-card">
                     <div className="card-header-flex">
                       <h2>Recorrido GPS (Puntos Registrados)</h2>

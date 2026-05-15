@@ -596,10 +596,94 @@
   font-size: 0.7rem;
 }
 
+/* Estilos para Actividades de Campo en Historial */
+.activities-history-card {
+  padding: 2.5rem !important;
+  margin-bottom: 2rem;
+}
+
+.activity-history-item {
+  padding-bottom: 2rem;
+}
+
+.act-type-tag {
+  display: inline-block;
+  background: rgba(168, 85, 247, 0.1);
+  color: #a855f7;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  margin-bottom: 0.4rem;
+}
+
+.act-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.act-meta strong {
+  color: var(--color-text-main);
+}
+
+.act-evidence {
+  display: flex;
+  gap: 1rem;
+}
+
+.evidence-thumb {
+  width: 100px;
+  height: 65px;
+  object-fit: cover;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 1px solid var(--color-border);
+  transition: transform 0.2s;
+}
+
+.evidence-thumb:hover {
+  transform: scale(1.05);
+}
+
+.marker-dot.success { background: var(--color-success); }
+.marker-dot.warning { background: var(--color-warning); }
+.marker-dot.danger { background: var(--color-danger); }
+
+.status-badge.finalizada { background: rgba(16, 185, 129, 0.1); color: var(--color-success); }
+.status-badge.pendiente { background: rgba(245, 158, 11, 0.1); color: var(--color-warning); }
+.status-badge.en_proceso { background: rgba(59, 130, 246, 0.1); color: var(--color-secondary); }
+
+.role-badge.mini {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  border-radius: 4px;
+  text-transform: uppercase;
+  margin-top: 0.5rem;
+}
+
+.role-badge.asesor {
+  background: rgba(168, 85, 247, 0.1);
+  color: #a855f7;
+  border: 1px solid rgba(168, 85, 247, 0.2);
+}
+
+.role-badge.operador {
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--color-success);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
 .clickable-row {
   cursor: pointer;
   transition: background 0.2s;
 }
+
 
 .clickable-row:hover {
   background: rgba(255, 255, 255, 0.05) !important;

@@ -20,6 +20,7 @@ const MainLayout = ({ children, title, subtitle }) => {
           const firstName = data.nombre_completo?.split(' ')[0] || 'Usuario';
           setUserName(firstName);
           localStorage.setItem('user_name', firstName);
+          localStorage.setItem('user_role', data.rol_info?.codigo || '');
         }
       } catch (err) {
         console.error('Error fetching profile in layout:', err);

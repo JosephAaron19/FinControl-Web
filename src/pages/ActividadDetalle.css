@@ -208,3 +208,152 @@
   color: #92400e;
   border: 1px solid #fcd34d;
 }
+
+/* Timeline de Actividades de Campo */
+.actividades-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 1.5rem;
+  position: relative;
+}
+
+.actividades-timeline::before {
+  content: '';
+  position: absolute;
+  left: 2rem;
+  top: 1.5rem;
+  bottom: 1.5rem;
+  width: 2px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.actividad-card {
+  position: relative;
+  padding-left: 2.5rem;
+  transition: transform 0.2s;
+}
+
+.actividad-card::after {
+  content: '';
+  position: absolute;
+  left: 1.7rem;
+  top: 0.5rem;
+  width: 12px;
+  height: 12px;
+  background: #1e293b;
+  border: 2px solid #a855f7;
+  border-radius: 50%;
+  z-index: 2;
+}
+
+.actividad-header {
+  background: rgba(255, 255, 255, 0.02);
+  padding: 1rem;
+  border-radius: 8px 8px 0 0;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.actividad-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.actividad-tipo-tag {
+  background-color: rgba(168, 85, 247, 0.15);
+  color: #a855f7;
+  padding: 0.2rem 0.6rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.actividad-hora {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-family: monospace;
+}
+
+.actividad-card h3 {
+  font-size: 1rem;
+  color: #fff;
+  margin: 0;
+}
+
+.actividad-body {
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.01);
+  border-radius: 0 0 8px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-top: none;
+}
+
+.actividad-desc {
+  font-size: 0.9rem;
+  color: #d1d5db;
+  margin-bottom: 1rem;
+  line-height: 1.5;
+}
+
+.actividad-details-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.detail-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: #9ca3af;
+}
+
+.detail-row strong {
+  color: #d1d5db;
+}
+
+.actividad-evidencias {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.evidencia-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.evidencia-label {
+  font-size: 0.75rem;
+  color: #6b7280;
+  font-weight: 600;
+}
+
+.evidencia-item img {
+  width: 120px;
+  height: 80px;
+  object-fit: cover;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: filter 0.2s;
+}
+
+.evidencia-item img:hover {
+  filter: brightness(1.2);
+}
+
+.actividad-card.finalizada::after { border-color: #10b981; }
+.actividad-card.finalizada .actividad-tipo-tag { background-color: rgba(16, 185, 129, 0.15); color: #10b981; }
+
+.actividad-card.pendiente::after { border-color: #f59e0b; }
+.actividad-card.pendiente .actividad-tipo-tag { background-color: rgba(245, 158, 11, 0.15); color: #f59e0b; }
+

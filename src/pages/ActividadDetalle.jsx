@@ -76,8 +76,9 @@ const ActividadDetalle = () => {
 
   if (!detalle) return null;
 
-  const { usuario, asistencia, resumen_gps, puntos_gps, incidencias } = detalle;
-  const sinActividad = puntos_gps.length === 0 && incidencias.length === 0 && asistencia.estado === 'Sin Marcar';
+  const { usuario, asistencia, resumen_gps, puntos_gps, incidencias, actividades_campo = [] } = detalle;
+  const isAsesor = usuario.rol_codigo === 'ASESOR';
+  const sinActividad = puntos_gps.length === 0 && incidencias.length === 0 && asistencia.estado === 'Sin Marcar' && actividades_campo.length === 0;
 
   return (
     <MainLayout 
@@ -178,6 +179,78 @@ const ActividadDetalle = () => {
                 </div>
               </div>
             </div>
+
+            {/* Tarjeta de Actividades de Campo (SOLO ASESORES) */}
+            {isAsesor && (
+              <div className="card mb-4">
+                <div className="card-header">
+                  <h2>Actividades de Campo</h2>
+                  <span className="badge-count">{actividades_campo.length}</span>
+                </div>
+                {actividades_campo.length === 0 ? (
+                  <div className="p-4 text-center text-muted">No se registraron actividades de campo en esta jornada.</div>
+                ) : (
+                  <div className="actividades-timeline">
+                    {actividades_campo.map((act, idx) => (
+                      <div key={idx} className={`actividad-card ${act.estado_actividad?.toLowerCase()}`}>
+                        <div className="actividad-header">
+                          <div className="actividad-title-row">
+                            <span className="actividad-tipo-tag">{act.tipo_actividad}</span>
+                            <span className="actividad-hora">{formatTime(act.hora_inicio_actividad)} - {act.hora_fin_actividad ? formatTime(act.hora_fin_actividad) : 'En proceso'}</span>
+                          </div>
+                          <h3>{act.titulo}</h3>
+                        </div>
+                        
+                        <div className="actividad-body">
+                          <p className="actividad-desc">{act.descripcion}</p>
+                          
+                          <div className="actividad-details-grid">
+                            <div className="detail-row">
+                              <User size={14} />
+                              <span><strong>Cliente:</strong> {act.cliente_nombre} ({act.cliente_documento})</span>
+                            </div>
+                            <div className="detail-row">
+                              <MapPin size={14} />
+                              <span><strong>Dirección:</strong> {act.direccion_actividad}</span>
+                            </div>
+                            {act.resultado_actividad && (
+                              <div className="detail-row">
+                                <CheckCircle size={14} />
+                                <span><strong>Resultado:</strong> {act.resultado_actividad}</span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Evidencias */}
+                          <div className="actividad-evidencias">
+                            {act.evidencia_inicio_url && (
+                              <div className="evidencia-item">
+                                <span className="evidencia-label">Inicio:</span>
+                                <img 
+                                  src={act.evidencia_inicio_url.startsWith('http') ? act.evidencia_inicio_url : `${API_URL.replace('/api', '')}${act.evidencia_inicio_url}`} 
+                                  alt="Evidencia Inicio" 
+                                  onClick={() => setSelectedImage(act.evidencia_inicio_url.startsWith('http') ? act.evidencia_inicio_url : `${API_URL.replace('/api', '')}${act.evidencia_inicio_url}`)}
+                                />
+                              </div>
+                            )}
+                            {act.evidencia_fin_url && (
+                              <div className="evidencia-item">
+                                <span className="evidencia-label">Fin:</span>
+                                <img 
+                                  src={act.evidencia_fin_url.startsWith('http') ? act.evidencia_fin_url : `${API_URL.replace('/api', '')}${act.evidencia_fin_url}`} 
+                                  alt="Evidencia Fin" 
+                                  onClick={() => setSelectedImage(act.evidencia_fin_url.startsWith('http') ? act.evidencia_fin_url : `${API_URL.replace('/api', '')}${act.evidencia_fin_url}`)}
+                                />
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Tarjeta de Incidencias */}
             <div className="card">

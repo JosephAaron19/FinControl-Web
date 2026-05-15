@@ -11,6 +11,10 @@ const Sidebar = () => {
     navigate('/login');
   };
 
+  const userRole = localStorage.getItem('user_role');
+  const isOperativo = userRole === 'OPERADOR' || userRole === 'ASESOR';
+  const isAdmin = userRole === 'SUPERADMIN' || userRole === 'GERENTE' || userRole === 'SUPERVISOR';
+
   return (
     <aside className="sidebar">
       <div className="sidebar-header">
@@ -19,29 +23,38 @@ const Sidebar = () => {
       </div>
       
       <nav className="sidebar-nav">
-        <NavLink to="/dashboard" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-          <LayoutDashboard size={20} />
-          <span>Dashboard</span>
-        </NavLink>
-        <NavLink to="/sedes" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-          <MapPin size={20} />
-          <span>Sedes</span>
-        </NavLink>
-        <NavLink to="/usuarios" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-          <Users size={20} />
-          <span>Usuarios</span>
-        </NavLink>
+        {isAdmin && (
+          <>
+            <NavLink to="/dashboard" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+              <LayoutDashboard size={20} />
+              <span>Dashboard</span>
+            </NavLink>
+            <NavLink to="/sedes" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+              <MapPin size={20} />
+              <span>Sedes</span>
+            </NavLink>
+            <NavLink to="/usuarios" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+              <Users size={20} />
+              <span>Usuarios</span>
+            </NavLink>
+          </>
+        )}
+
         <NavLink to="/actividad" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
           <Activity size={20} />
-          <span>Actividad</span>
+          <span>{isOperativo ? 'Mi Actividad' : 'Monitoreo'}</span>
         </NavLink>
-        <NavLink to="/jornada" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-          <Calendar size={20} />
-          <span>Gestión de Jornada</span>
-        </NavLink>
+
+        {isAdmin && (
+          <NavLink to="/jornada" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+            <Calendar size={20} />
+            <span>Gestión Jornada</span>
+          </NavLink>
+        )}
+
         <NavLink to="/historial-jornadas" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
           <Settings size={20} />
-          <span>Historial de Jornadas</span>
+          <span>{isOperativo ? 'Mi Historial' : 'Historial General'}</span>
         </NavLink>
       </nav>
 
