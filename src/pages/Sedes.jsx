@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Edit2, Trash2, MapPin, X } from 'lucide-react';
 import MainLayout from '../layouts/MainLayout';
+import { useNotification } from '../context/NotificationContext';
 import './Sedes.css';
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://apifincontrol.finatech.com.pe/api';
@@ -9,6 +10,7 @@ const API_URL = import.meta.env.VITE_API_URL || 'https://apifincontrol.finatech.
 
 const Sedes = () => {
   const navigate = useNavigate();
+  const { showNotification } = useNotification();
   const [sedes, setSedes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -123,12 +125,14 @@ const Sedes = () => {
       if (res.ok) {
         fetchSedes();
         handleCloseModal();
+        showNotification(currentSede ? 'Sede actualizada correctamente.' : 'Sede creada correctamente.', 'success');
       } else {
         const errorData = await res.json();
-        alert(`Error al guardar: ${JSON.stringify(errorData)}`);
+        showNotification(`Error al guardar: ${JSON.stringify(errorData)}`, 'error');
       }
     } catch (err) {
       console.error('Error saving sede:', err);
+      showNotification('No se pudo realizar la acción. Verifique su conexión.', 'error');
     }
   };
 
@@ -144,11 +148,13 @@ const Sedes = () => {
 
       if (res.ok) {
         fetchSedes();
+        showNotification('Sede eliminada correctamente.', 'success');
       } else {
-        alert('Error al eliminar la sede');
+        showNotification('Error al eliminar la sede.', 'error');
       }
     } catch (err) {
       console.error('Error deleting sede:', err);
+      showNotification('No se pudo realizar la acción.', 'error');
     }
   };
 
@@ -234,7 +240,7 @@ const Sedes = () => {
       {/* Modal */}
       {isModalOpen && (
         <div className="modal-overlay">
-          <div className="modal-content">
+          <div className="modal-content modal-large">
             <div className="modal-header">
               <h2>{currentSede ? 'Editar Sede' : 'Nueva Sede'}</h2>
               <button className="btn-icon" onClick={handleCloseModal}>

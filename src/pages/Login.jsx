@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Lock, Mail, ArrowRight, ShieldCheck, Eye, EyeOff } from 'lucide-react';
+import { useNotification } from '../context/NotificationContext';
 import './Login.css';
 
 const Login = () => {
@@ -9,6 +10,7 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const { showNotification } = useNotification();
 
   const [error, setError] = useState(null);
 
@@ -33,10 +35,19 @@ const Login = () => {
       const data = await response.json();
       localStorage.setItem('access_token', data.access);
       localStorage.setItem('refresh_token', data.refresh);
+      localStorage.setItem('user_role', data.user_role || '');
+      localStorage.setItem('user_name', data.user_name || '');
       
-      navigate('/dashboard');
+      const role = (data.user_role || '').toUpperCase();
+      showNotification(`Bienvenido, ${data.user_name || 'Usuario'}`, 'success');
+      if (role === 'OPERADOR' || role === 'ASESOR') {
+        navigate('/actividad');
+      } else {
+        navigate('/dashboard');
+      }
     } catch (err) {
       setError(err.message);
+      showNotification(err.message === 'Credenciales inválidas' ? 'DNI o contraseña incorrectos' : 'Error al conectar con el servidor', 'error');
     } finally {
       setIsLoading(false);
     }

@@ -10,7 +10,8 @@ import {
   MapPin,
   User,
   AlertCircle,
-  Activity
+  Activity,
+  CheckCircle
 } from 'lucide-react';
 import MainLayout from '../layouts/MainLayout';
 import useWebSockets from '../hooks/useWebSockets';
@@ -33,7 +34,8 @@ const HistorialJornadas = () => {
   // Filters for history
   const [filters, setFilters] = useState({
     fecha_inicio: '',
-    fecha_fin: ''
+    fecha_fin: '',
+    estado_asistencia: ''
   });
 
   const fetchHistorial = useCallback(async (userId) => {
@@ -45,6 +47,7 @@ const HistorialJornadas = () => {
       queryParams.append('usuario', userId);
       if (filters.fecha_inicio) queryParams.append('fecha_inicio', filters.fecha_inicio);
       if (filters.fecha_fin) queryParams.append('fecha_fin', filters.fecha_fin);
+      if (filters.estado_asistencia) queryParams.append('estado_asistencia', filters.estado_asistencia);
 
       const res = await fetch(`${API_URL}/historial-jornadas/?${queryParams.toString()}`, {
         headers: { Authorization: `Bearer ${token}` }
@@ -149,9 +152,66 @@ const HistorialJornadas = () => {
     }
   };
 
+  const humanizeDuration = (h, m, s) => {
+    let result = [];
+    if (h > 0) result.push(`${h}h`);
+    if (m > 0) result.push(`${m}min`);
+    if (s > 0 || result.length === 0) result.push(`${s}seg`);
+    return result.join(' ');
+  };
+
   const formatDuration = (duration) => {
     if (!duration) return '-';
-    return duration.split('.')[0];
+    // Si viene en formato HH:MM:SS.mmmm o similar de Django DurationField
+    if (typeof duration === 'string' && duration.includes(':')) {
+      const parts = duration.split('.')[0].split(':');
+      if (parts.length >= 3) {
+        return humanizeDuration(parseInt(parts[0]), parseInt(parts[1]), parseInt(parts[2]));
+      }
+      return duration.split('.')[0];
+    }
+    return duration;
+  };
+
+  const calculateDuration = (start, end) => {
+    if (!start || !end) return '-';
+    try {
+      const d1 = new Date(start);
+      const d2 = new Date(end);
+      const diff = Math.abs(d2 - d1);
+      
+      const hours = Math.floor(diff / 3600000);
+      const minutes = Math.floor((diff % 3600000) / 60000);
+      const seconds = Math.floor((diff % 60000) / 1000);
+      
+      return humanizeDuration(hours, minutes, seconds);
+    } catch (e) {
+      return '-';
+    }
+  };
+
+  const attendanceLabels = {
+    'programada': 'Programada',
+    'en_proceso': 'En proceso',
+    'completa': 'Completa',
+    'incompleta': 'Incompleta',
+    'ausente': 'Ausente'
+  };
+
+  const punctualityLabels = {
+    'temprano': 'Entrada Anticipada',
+    'puntual': 'Entrada Puntual',
+    'tardanza': 'Tardanza (Entrada)',
+    'no_marco_entrada': 'No marcó entrada',
+    'pendiente': 'Pendiente'
+  };
+
+  const exitStatusLabels = {
+    'temprano': 'Salida Temprana',
+    'puntual': 'Salida Puntual',
+    'tardanza': 'Salida Tardía',
+    'no_marco_salida': 'No marcó salida',
+    'pendiente': 'Pendiente'
   };
 
   const formatTime = (isoString) => {
@@ -238,6 +298,17 @@ const HistorialJornadas = () => {
                   <label><Calendar size={16} /> Hasta</label>
                   <input type="date" name="fecha_fin" value={filters.fecha_fin} onChange={handleFilterChange} className="input-field" />
                 </div>
+                <div className="filter-group">
+                  <label><Filter size={16} /> Asistencia</label>
+                  <select name="estado_asistencia" value={filters.estado_asistencia} onChange={handleFilterChange} className="input-field">
+                    <option value="">Todos los estados</option>
+                    <option value="programada">Programada</option>
+                    <option value="en_proceso">En proceso</option>
+                    <option value="completa">Completa</option>
+                    <option value="incompleta">Incompleta</option>
+                    <option value="ausente">Ausente</option>
+                  </select>
+                </div>
                 <div className="filter-actions">
                   <button type="submit" className="btn-primary"><Search size={18} /> Filtrar</button>
                 </div>
@@ -262,6 +333,7 @@ const HistorialJornadas = () => {
                         <th>Incidencias</th>
                         <th>GPS</th>
                         <th>Estado</th>
+                        <th>Asistencia</th>
                         <th>Acción</th>
                       </tr>
                     </thead>
@@ -271,7 +343,7 @@ const HistorialJornadas = () => {
                           <td>{new Date(item.fecha + 'T00:00:00').toLocaleDateString()}</td>
                           <td>{formatTime(item.hora_entrada)}</td>
                           <td>{formatTime(item.hora_salida)}</td>
-                          <td><span className="duration-tag">{formatDuration(item.total_horas_trabajadas)}</span></td>
+                          <td><span className="duration-tag">{item.total_horas_trabajadas ? formatDuration(item.total_horas_trabajadas) : calculateDuration(item.hora_entrada, item.hora_salida)}</span></td>
                           <td className="text-center">
                             {item.total_incidencias > 0 ? (
                               <span className="count-badge danger">{item.total_incidencias}</span>
@@ -282,7 +354,19 @@ const HistorialJornadas = () => {
                               <span className="count-badge info">{item.total_puntos_gps}</span>
                             ) : '-'}
                           </td>
-                          <td><span className={`status-badge ${item.estado_jornada?.toLowerCase() || 'completada'}`}>{item.estado_jornada || 'Completada'}</span></td>
+                          <td>
+                            <div className="flex flex-col gap-1">
+                              <span className={`status-badge ${item.estado_puntualidad || 'pendiente'}`}>
+                                {punctualityLabels[item.estado_puntualidad || 'pendiente']}
+                              </span>
+                              {item.hora_salida && (
+                                <span className={`status-badge ${item.estado_salida || 'pendiente'}`}>
+                                  {exitStatusLabels[item.estado_salida || 'pendiente']}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td><span className={`status-badge ${item.estado_asistencia}`}>{attendanceLabels[item.estado_asistencia] || item.estado_asistencia}</span></td>
                           <td><ChevronRight size={18} /></td>
                         </tr>
                       ))}
@@ -321,10 +405,34 @@ const HistorialJornadas = () => {
                           </span>
                         </div>
                       </div>
-                      <span className={`status-badge large ${jornadaDetalle.estado_jornada?.toLowerCase() || 'completada'}`}>
-                        {jornadaDetalle.estado_jornada || 'Completada'}
-                      </span>
+                      <div className="flex flex-col gap-2 items-end">
+                        <span className={`status-badge large ${jornadaDetalle.estado_jornada?.toLowerCase() || 'completada'}`}>
+                          {jornadaDetalle.estado_jornada || 'Completada'}
+                        </span>
+                        <div className="flex gap-2">
+                          <span className={`status-badge ${jornadaDetalle.estado_asistencia}`}>
+                            {attendanceLabels[jornadaDetalle.estado_asistencia] || jornadaDetalle.estado_asistencia}
+                          </span>
+                          <span className={`status-badge ${jornadaDetalle.estado_puntualidad}`}>
+                            {punctualityLabels[jornadaDetalle.estado_puntualidad] || jornadaDetalle.estado_puntualidad}
+                          </span>
+                          {jornadaDetalle.hora_salida && (
+                            <span className={`status-badge ${jornadaDetalle.estado_salida}`}>
+                              {exitStatusLabels[jornadaDetalle.estado_salida] || jornadaDetalle.estado_salida}
+                            </span>
+                          )}
+                        </div>
+                        {jornadaDetalle.puntos_gps?.length > 0 && (
+                          <button 
+                            className="btn btn-secondary btn-sm mt-2" 
+                            onClick={() => window.open(`${API_URL}/historial-jornadas/${jornadaDetalle.id}/tracking-map/`, '_blank')}
+                          >
+                            <MapPin size={16} /> Ver Mapa de Recorrido
+                          </button>
+                        )}
+                      </div>
                     </div>
+
                     
                     <div className="metrics-grid">
                       <div className="metric-item">
@@ -345,14 +453,28 @@ const HistorialJornadas = () => {
                         <Activity size={20} />
                         <div className="metric-val">
                           <span>Horas Trabajadas</span>
-                          <strong>{formatDuration(jornadaDetalle.total_horas_trabajadas)}</strong>
+                          <strong>{jornadaDetalle.total_horas_trabajadas ? formatDuration(jornadaDetalle.total_horas_trabajadas) : calculateDuration(jornadaDetalle.hora_entrada, jornadaDetalle.hora_salida)}</strong>
                         </div>
                       </div>
                       <div className="metric-item">
                         <Clock size={20} className="text-warning" />
                         <div className="metric-val">
                           <span>Total Descanso</span>
-                          <strong>{formatDuration(jornadaDetalle.total_tiempo_break)}</strong>
+                          <strong>{jornadaDetalle.total_tiempo_break ? formatDuration(jornadaDetalle.total_tiempo_break) : calculateDuration(jornadaDetalle.hora_inicio_break, jornadaDetalle.hora_fin_break)}</strong>
+                        </div>
+                      </div>
+                      <div className="metric-item">
+                        <Activity size={20} className="text-info" />
+                        <div className="metric-val">
+                          <span>Estado Asistencia</span>
+                          <strong>{attendanceLabels[jornadaDetalle.estado_asistencia] || jornadaDetalle.estado_asistencia}</strong>
+                        </div>
+                      </div>
+                      <div className="metric-item">
+                        <CheckCircle size={20} className="text-success" />
+                        <div className="metric-val">
+                          <span>Salida / Puntualidad</span>
+                          <strong>{exitStatusLabels[jornadaDetalle.estado_salida] || jornadaDetalle.estado_salida || 'Pendiente'}</strong>
                         </div>
                       </div>
                     </div>

@@ -180,6 +180,16 @@
   color: #10b981;
 }
 
+.status-badge.temprano {
+  background-color: rgba(59, 130, 246, 0.1);
+  color: var(--color-secondary);
+}
+
+.status-badge.pendiente {
+  background-color: rgba(156, 163, 175, 0.1);
+  color: var(--color-text-muted);
+}
+
 .flex { display: flex; }
 .items-center { align-items: center; }
 .gap-2 { gap: 0.5rem; }

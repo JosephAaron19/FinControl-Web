@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Edit2, Trash2, Calendar, X } from 'lucide-react';
+import { Plus, Edit2, Trash2, Calendar, X, MapPin } from 'lucide-react';
 import MainLayout from '../layouts/MainLayout';
-import './Sedes.css'; // Reutilizamos estilos de sedes para consistencia
+import { useNotification } from '../context/NotificationContext';
+import './Sedes.css'; 
 import './GestionJornada.css';
 
 
@@ -10,6 +11,7 @@ const API_URL = import.meta.env.VITE_API_URL || 'https://apifincontrol.finatech.
 
 const GestionJornada = () => {
   const navigate = useNavigate();
+  const { showNotification } = useNotification();
   const [configs, setConfigs] = useState([]);
   const [sedes, setSedes] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -17,7 +19,7 @@ const GestionJornada = () => {
   const [currentConfig, setCurrentConfig] = useState(null);
   
   const [formData, setFormData] = useState({
-    sede: '',
+    sedes_ids: [],
     dia_semana: 'lunes',
     hora_inicio_marcacion: '08:00:00',
     hora_fin_marcacion: '09:00:00',
@@ -83,7 +85,7 @@ const GestionJornada = () => {
     if (config) {
       setCurrentConfig(config);
       setFormData({
-        sede: config.sede,
+        sedes_ids: [config.sede], // En edición solo es una
         dia_semana: config.dia_semana,
         hora_inicio_marcacion: config.hora_inicio_marcacion,
         hora_fin_marcacion: config.hora_fin_marcacion,
@@ -94,8 +96,10 @@ const GestionJornada = () => {
       });
     } else {
       setCurrentConfig(null);
+      // POR DEFECTO: Seleccionar TODAS las sedes autorizadas para creación masiva
+      const allSedesIds = sedes.map(s => s.id);
       setFormData({
-        sede: sedes.length > 0 ? sedes[0].id : '',
+        sedes_ids: allSedesIds,
         dia_semana: 'lunes',
         hora_inicio_marcacion: '08:00:00',
         hora_fin_marcacion: '09:00:00',
@@ -106,6 +110,19 @@ const GestionJornada = () => {
       });
     }
     setIsModalOpen(true);
+  };
+
+  const toggleSede = (sedeId) => {
+    if (currentConfig) return; // No se puede cambiar sede en edición individual
+    
+    setFormData(prev => {
+      const current = prev.sedes_ids || [];
+      const isSelected = current.includes(sedeId);
+      const newSedes = isSelected
+        ? current.filter(id => id !== sedeId)
+        : [...current, sedeId];
+      return { ...prev, sedes_ids: newSedes };
+    });
   };
 
   const handleCloseModal = () => {
@@ -125,38 +142,73 @@ const GestionJornada = () => {
     e.preventDefault();
     const token = localStorage.getItem('access_token');
     
-    const url = currentConfig 
-      ? `${API_URL}/jornada-configuracion/${currentConfig.id}/` 
-      : `${API_URL}/jornada-configuracion/`;
-      
-    const method = currentConfig ? 'PUT' : 'POST';
-
-    const dataToSend = {
-      ...formData,
-      hora_inicio_salida: formData.hora_inicio_salida || null,
-      hora_fin_salida: formData.hora_fin_salida || null,
-      observacion: formData.observacion || null
-    };
+    if (formData.sedes_ids.length === 0) {
+      showNotification('Debes seleccionar al menos una sede.', 'warning');
+      return;
+    }
 
     try {
-      const res = await fetch(url, {
-        method,
-        headers: { 
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}` 
-         },
-        body: JSON.stringify(dataToSend)
-      });
+      if (currentConfig) {
+        // ACTUALIZACIÓN INDIVIDUAL
+        const url = `${API_URL}/jornada-configuracion/${currentConfig.id}/`;
+        const dataToSend = {
+          ...formData,
+          sede: formData.sedes_ids[0],
+          hora_inicio_salida: formData.hora_inicio_salida || null,
+          hora_fin_salida: formData.hora_fin_salida || null,
+          observacion: formData.observacion || null
+        };
+        
+        const res = await fetch(url, {
+          method: 'PUT',
+          headers: { 
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}` 
+          },
+          body: JSON.stringify(dataToSend)
+        });
 
-      if (res.ok) {
-        fetchConfigs();
-        handleCloseModal();
+        if (res.ok) {
+          showNotification('Configuración actualizada correctamente.', 'success');
+        } else {
+          showNotification('No se pudo realizar la actualización.', 'error');
+        }
       } else {
-        const errorData = await res.json();
-        alert(`Error al guardar: ${JSON.stringify(errorData)}`);
+        // CREACIÓN MASIVA
+        const promises = formData.sedes_ids.map(sedeId => {
+          const dataToSend = {
+            ...formData,
+            sede: sedeId,
+            hora_inicio_salida: formData.hora_inicio_salida || null,
+            hora_fin_salida: formData.hora_fin_salida || null,
+            observacion: formData.observacion || null
+          };
+          
+          return fetch(`${API_URL}/jornada-configuracion/`, {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}` 
+            },
+            body: JSON.stringify(dataToSend)
+          });
+        });
+
+        const results = await Promise.all(promises);
+        const allOk = results.every(r => r.ok);
+        
+        if (allOk) {
+          showNotification('Jornadas creadas correctamente para todas las sedes.', 'success');
+        } else {
+          showNotification('Algunas jornadas no pudieron crearse (posiblemente ya existen).', 'warning');
+        }
       }
+
+      fetchConfigs();
+      handleCloseModal();
     } catch (err) {
       console.error('Error saving config:', err);
+      showNotification('Error de conexión al intentar guardar.', 'error');
     }
   };
 
@@ -172,11 +224,13 @@ const GestionJornada = () => {
 
       if (res.ok) {
         fetchConfigs();
+        showNotification('Configuración eliminada correctamente.', 'success');
       } else {
-        alert('Error al eliminar la configuración');
+        showNotification('Error al eliminar la configuración.', 'error');
       }
     } catch (err) {
       console.error('Error deleting config:', err);
+      showNotification('No se pudo realizar la acción.', 'error');
     }
   };
 
@@ -188,7 +242,7 @@ const GestionJornada = () => {
   return (
     <MainLayout 
       title="Gestión de Jornadas" 
-      subtitle="Configura los horarios permitidos para marcar entrada por sede."
+      subtitle="Configura los rangos de tiempo para entrada y salida. (La salida ahora permite marcaciones fuera del horario para seguimiento)."
     >
       <div className="sedes-container card">
         <div className="sedes-header">
@@ -265,7 +319,7 @@ const GestionJornada = () => {
       {/* Modal */}
       {isModalOpen && (
         <div className="modal-overlay">
-          <div className="modal-content">
+          <div className="modal-content modal-large">
             <div className="modal-header">
               <h2>{currentConfig ? 'Editar Configuración' : 'Nueva Configuración'}</h2>
               <button className="btn-icon" onClick={handleCloseModal}>
@@ -275,19 +329,34 @@ const GestionJornada = () => {
             
             <form onSubmit={handleSubmit} className="modal-form">
               <div className="form-group">
-                <label>Sede</label>
-                <select 
-                  name="sede"
-                  value={formData.sede} 
-                  onChange={handleInputChange} 
-                  required 
-                  className="input-field"
-                >
-                  <option value="">Seleccione una sede</option>
-                  {sedes.map(sede => (
-                    <option key={sede.id} value={sede.id}>{sede.nombre}</option>
-                  ))}
-                </select>
+                <label>Sedes donde se aplicará este horario *</label>
+                <div className="sede-selection-container">
+                  <div className="selection-header-info">
+                    <h4>{currentConfig ? 'Sede asignada' : 'Selección Masiva'}</h4>
+                    <span className="badge-count">
+                      {formData.sedes_ids.length} seleccionadas
+                    </span>
+                  </div>
+                  
+                  <div className="sede-chips-grid">
+                    {sedes.map(sede => {
+                      const isSelected = formData.sedes_ids.includes(sede.id);
+                      return (
+                        <div 
+                          key={sede.id} 
+                          className={`sede-chip-item ${isSelected ? 'selected' : ''}`}
+                          onClick={() => toggleSede(sede.id)}
+                          style={currentConfig ? { cursor: 'default' } : {}}
+                        >
+                          <div className="chip-icon-wrapper">
+                            <MapPin size={16} />
+                          </div>
+                          <span className="sede-chip-name">{sede.nombre}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
 
               <div className="form-group">
@@ -354,6 +423,9 @@ const GestionJornada = () => {
                     className="input-field"
                     step="1"
                   />
+                  <small className="form-hint" style={{ color: '#888', fontSize: '0.8rem', marginTop: '4px', display: 'block' }}>
+                    Nota: La salida se permitirá incluso después de esta hora para seguimiento de demoras.
+                  </small>
                 </div>
               </div>
 

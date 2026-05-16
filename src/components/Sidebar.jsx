@@ -11,9 +11,9 @@ const Sidebar = () => {
     navigate('/login');
   };
 
-  const userRole = localStorage.getItem('user_role');
+  const userRole = (localStorage.getItem('user_role') || '').toUpperCase();
   const isOperativo = userRole === 'OPERADOR' || userRole === 'ASESOR';
-  const isAdmin = userRole === 'SUPERADMIN' || userRole === 'GERENTE' || userRole === 'SUPERVISOR';
+  const isAdmin = userRole === 'SUPERADMIN' || userRole === 'GERENTE' || userRole === 'SUPERVISOR' || userRole === 'ADMIN';
 
   return (
     <aside className="sidebar">

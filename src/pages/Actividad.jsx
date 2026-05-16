@@ -85,17 +85,33 @@ const Actividad = () => {
 
   // Cálculos para las tarjetas de resumen
   const totalOperativos = actividades.length;
-  const activosHoy = actividades.filter(a => a.estado !== 'Sin Marcar').length;
-  const sinMarcar = actividades.filter(a => a.estado === 'Sin Marcar').length;
-  const enBreak = actividades.filter(a => a.estado === 'En Break').length;
+  const activosHoy = actividades.filter(a => a.asistencia && a.asistencia.estado !== 'Sin Marcar').length;
+  const sinMarcar = actividades.filter(a => !a.asistencia || a.asistencia.estado === 'Sin Marcar').length;
+  const enBreak = actividades.filter(a => a.asistencia && a.asistencia.estado === 'En break').length;
   const enActividad = actividades.filter(a => a.actividad_actual).length;
-  const fueraDeZona = actividades.filter(a => a.fuera_de_zona).length;
+  const fueraDeZona = actividades.filter(a => a.ultima_ubicacion?.distancia > (a.sede_info?.radio_metros || 500)).length;
   const conIncidencias = actividades.filter(a => a.incidencias > 0).length;
 
   const formatTime = (isoString) => {
     if (!isoString) return '-';
     const date = new Date(isoString);
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  const punctualityLabels = {
+    'temprano': 'Entrada Anticipada',
+    'puntual': 'Entrada Puntual',
+    'tardanza': 'Tardanza (Entrada)',
+    'no_marco_entrada': 'No marcó entrada',
+    'pendiente': 'Pendiente'
+  };
+
+  const exitStatusLabels = {
+    'temprano': 'Salida Temprana',
+    'puntual': 'Salida Puntual',
+    'tardanza': 'Salida Tardía',
+    'no_marco_salida': 'No marcó salida',
+    'pendiente': 'Pendiente'
   };
 
   return (
@@ -198,30 +214,30 @@ const Actividad = () => {
                         </div>
                       </td>
                       <td>
-                        <span className={`role-badge mini ${user.rol_codigo?.toLowerCase()}`}>
-                          {user.rol_nombre || '-'}
+                        <span className={`role-badge mini ${user.rol_info?.codigo?.toLowerCase()}`}>
+                          {user.rol_info?.nombre || '-'}
                         </span>
                       </td>
                       <td>{user.sede}</td>
                       <td>
                         <div className="time-stack">
-                          <span title="Entrada">E: {formatTime(user.hora_entrada)}</span>
-                          {user.hora_inicio_break && (
+                          <span title="Entrada">E: {formatTime(user.asistencia?.hora_entrada)}</span>
+                          {user.asistencia?.hora_inicio_break && (
                             <span title="Break" className="text-xs text-warning">
-                              B: {formatTime(user.hora_inicio_break)}
+                              B: {formatTime(user.asistencia?.hora_inicio_break)}
                             </span>
                           )}
-                          <span title="Salida">S: {formatTime(user.hora_salida)}</span>
+                          <span title="Salida">S: {formatTime(user.asistencia?.hora_salida)}</span>
                         </div>
                       </td>
                       <td>
-                        {user.rol_codigo === 'ASESOR' ? (
+                        {user.rol_info?.codigo === 'ASESOR' ? (
                           <div className="actividad-cell">
                             {user.actividad_actual ? (
                               <div className="actividad-current">
                                 <span className="actividad-label">En proceso:</span>
-                                <span className="actividad-name">{user.actividad_actual.tipo_nombre}</span>
-                                <span className="actividad-time">{formatTime(user.actividad_actual.hora_inicio)}</span>
+                                <span className="actividad-name">{user.actividad_actual.titulo}</span>
+                                <span className="actividad-time">{formatTime(user.actividad_actual.hora_inicio_actividad)}</span>
                               </div>
                             ) : (
                               <span className="text-muted text-xs">Sin actividad en proceso</span>
@@ -240,13 +256,25 @@ const Actividad = () => {
                         </span>
                       </td>
                       <td>
-                        <span className={`status-badge ${user.estado.toLowerCase().replace(' ', '-')}`}>
-                          {user.estado}
-                        </span>
+                        <div className="flex flex-col gap-1">
+                          <span className={`status-badge ${(user.asistencia?.estado || 'Sin Marcar').toLowerCase().replace(' ', '-')}`}>
+                            {user.asistencia?.estado || 'Sin Marcar'}
+                          </span>
+                          {user.asistencia?.estado_puntualidad && user.asistencia.estado_puntualidad !== 'pendiente' && (
+                             <span className={`status-badge small ${user.asistencia.estado_puntualidad}`}>
+                               {punctualityLabels[user.asistencia.estado_puntualidad] || user.asistencia.estado_puntualidad}
+                             </span>
+                          )}
+                          {user.asistencia?.estado_salida && user.asistencia.estado_salida !== 'pendiente' && (
+                             <span className={`status-badge small ${user.asistencia.estado_salida}`}>
+                               {exitStatusLabels[user.asistencia.estado_salida] || user.asistencia.estado_salida}
+                             </span>
+                          )}
+                        </div>
                       </td>
                       <td>
                         <div className="alerts-cell">
-                          {user.fuera_de_zona && (
+                          {user.ultima_ubicacion?.distancia > (user.sede_info?.radio_metros || 500) && (
                             <span className="alert-badge warning" title="Fuera de Zona">
                               <MapPin size={14} />
                               FZ
@@ -258,7 +286,7 @@ const Actividad = () => {
                               {user.incidencias} Inc.
                             </span>
                           )}
-                          {!user.fuera_de_zona && user.incidencias === 0 && user.estado !== 'Sin Marcar' && (
+                          {!(user.ultima_ubicacion?.distancia > (user.sede_info?.radio_metros || 500)) && user.incidencias === 0 && user.asistencia && user.asistencia.estado !== 'Sin Marcar' && (
                             <span className="alert-badge success">
                               <CheckCircle size={14} />
                               OK

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Users, 
@@ -13,6 +13,7 @@ import {
   Calendar
 } from 'lucide-react';
 import MainLayout from '../layouts/MainLayout';
+import useWebSockets from '../hooks/useWebSockets';
 import './Dashboard.css';
 
 const API_URL = import.meta.env.VITE_API_URL;
@@ -28,52 +29,58 @@ const Dashboard = () => {
   const [recentActivity, setRecentActivity] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchDashboardData = async () => {
-      const token = localStorage.getItem('access_token');
-      if (!token) {
-        navigate('/login');
-        return;
-      }
+  const fetchDashboardData = useCallback(async () => {
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+      navigate('/login');
+      return;
+    }
 
-      try {
-        const headers = { Authorization: `Bearer ${token}` };
-        
-        // Parallel fetching for efficiency
-        const [userRes, asisRes, sedeRes, incRes, actRes] = await Promise.all([
-          fetch(`${API_URL}/usuarios/`, { headers }),
-          fetch(`${API_URL}/asistencias/`, { headers }),
-          fetch(`${API_URL}/sedes/`, { headers }),
-          fetch(`${API_URL}/incidencias/`, { headers }),
-          fetch(`${API_URL}/actividad/hoy/`, { headers })
-        ]);
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      
+      // Parallel fetching for efficiency
+      const [userRes, asisRes, sedeRes, incRes, actRes] = await Promise.all([
+        fetch(`${API_URL}/usuarios/`, { headers }),
+        fetch(`${API_URL}/asistencias/`, { headers }),
+        fetch(`${API_URL}/sedes/`, { headers }),
+        fetch(`${API_URL}/incidencias/`, { headers }),
+        fetch(`${API_URL}/actividad/hoy/`, { headers })
+      ]);
 
-        const [users, asistencias, sedes, incidencias, actividad] = await Promise.all([
-          userRes.json(),
-          asisRes.json(),
-          sedeRes.json(),
-          incRes.json(),
-          actRes.json()
-        ]);
-        
-        setStats({
-          usuarios: Array.isArray(users) ? users.length : 0,
-          asistencias: Array.isArray(asistencias) ? asistencias.length : 0,
-          sedes: Array.isArray(sedes) ? sedes.length : 0,
-          incidencias: Array.isArray(incidencias) ? incidencias.length : 0
-        });
+      const [users, asistencias, sedes, incidencias, actividad] = await Promise.all([
+        userRes.json(),
+        asisRes.json(),
+        sedeRes.json(),
+        incRes.json(),
+        actRes.json()
+      ]);
+      
+      setStats({
+        usuarios: Array.isArray(users) ? users.length : 0,
+        asistencias: Array.isArray(asistencias) ? asistencias.length : 0,
+        sedes: Array.isArray(sedes) ? sedes.length : 0,
+        incidencias: Array.isArray(incidencias) ? incidencias.length : 0
+      });
 
-        // Use top 5 for recent activity
-        setRecentActivity(Array.isArray(actividad) ? actividad.slice(0, 5) : []);
-      } catch (err) {
-        console.error('Error fetching dashboard data:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchDashboardData();
+      // Use top 5 for recent activity
+      setRecentActivity(Array.isArray(actividad) ? actividad.slice(0, 5) : []);
+    } catch (err) {
+      console.error('Error fetching dashboard data:', err);
+    } finally {
+      setLoading(false);
+    }
   }, [navigate]);
+
+  useWebSockets((data) => {
+    if (data.type === 'attendance_update') {
+      fetchDashboardData();
+    }
+  });
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, [fetchDashboardData]);
 
   return (
     <MainLayout 

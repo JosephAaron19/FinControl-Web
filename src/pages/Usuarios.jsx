@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Edit2, Trash2, User, Key, X, Search, Filter, Shield, Building } from 'lucide-react';
+import { Plus, Edit2, Trash2, User, Key, X, Search, Filter, Shield, Building, CheckCircle, MapPin } from 'lucide-react';
 import MainLayout from '../layouts/MainLayout';
+import { useNotification } from '../context/NotificationContext';
 import './Usuarios.css';
 
 const API_URL = import.meta.env.VITE_API_URL;
 
 const Usuarios = () => {
   const navigate = useNavigate();
+  const { showNotification } = useNotification();
   const [usuarios, setUsuarios] = useState([]);
   const [userProfile, setUserProfile] = useState(null);
   const [sedes, setSedes] = useState([]);
@@ -19,7 +21,9 @@ const Usuarios = () => {
   // Modales
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
   const [currentUsuario, setCurrentUsuario] = useState(null);
+  const [newCredentials, setNewCredentials] = useState(null);
   
   // Filtros
   const [searchTerm, setSearchTerm] = useState('');
@@ -39,7 +43,8 @@ const Usuarios = () => {
     rol: '',
     activo: true,
     debe_cambiar_password: true,
-    observacion: ''
+    observacion: '',
+    sedes_ids: []
   });
 
   // Formulario Contraseña
@@ -127,10 +132,15 @@ const Usuarios = () => {
         rol: usuario.rol || '',
         activo: usuario.activo,
         debe_cambiar_password: usuario.debe_cambiar_password,
-        observacion: usuario.observacion || ''
+        observacion: usuario.observacion || '',
+        sedes_ids: usuario.sedes_ids || []
       });
     } else {
       setCurrentUsuario(null);
+      // Si es gerente o supervisor, pre-seleccionar su sede principal
+      const userRole = userProfile?.rol_info?.codigo?.toLowerCase() || '';
+      const isManager = userRole.includes('gerente') || userRole.includes('supervisor');
+      
       setFormData({
         dni: '',
         nombre_completo: '',
@@ -138,11 +148,12 @@ const Usuarios = () => {
         cargo: '',
         telefono: '',
         email: '',
-        sede: '',
+        sede: isManager ? (userProfile?.sede || '') : '',
         rol: '',
         activo: true,
         debe_cambiar_password: true,
-        observacion: ''
+        observacion: '',
+        sedes_ids: isManager ? [userProfile?.sede].filter(Boolean) : []
       });
     }
     setIsModalOpen(true);
@@ -169,10 +180,23 @@ const Usuarios = () => {
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value
-    }));
+    
+    setFormData(prev => {
+      const newData = {
+        ...prev,
+        [name]: type === 'checkbox' ? checked : value
+      };
+
+      // Si cambia la sede central, asegurarnos de que esté en sedes_ids
+      if (name === 'sede' && value) {
+        const sedeId = parseInt(value);
+        if (!prev.sedes_ids.includes(sedeId)) {
+          newData.sedes_ids = [...prev.sedes_ids, sedeId];
+        }
+      }
+
+      return newData;
+    });
   };
 
   const handlePasswordInputChange = (e) => {
@@ -181,6 +205,22 @@ const Usuarios = () => {
       ...prev,
       [name]: type === 'checkbox' ? checked : value
     }));
+  };
+
+  const toggleSede = (sedeId) => {
+    setFormData(prev => {
+      const currentSedes = prev.sedes_ids || [];
+      const isSelected = currentSedes.includes(sedeId);
+      
+      // La sede central siempre debe estar en sedes_ids
+      if (sedeId === parseInt(prev.sede)) return prev;
+
+      const newSedes = isSelected
+        ? currentSedes.filter(id => id !== sedeId)
+        : [...currentSedes, sedeId];
+        
+      return { ...prev, sedes_ids: newSedes };
+    });
   };
 
   const handleSubmit = async (e) => {
@@ -219,14 +259,27 @@ const Usuarios = () => {
       });
 
       if (res.ok) {
+        const data = await res.json();
         fetchData();
         handleCloseModal();
+        if (!currentUsuario) {
+          setNewCredentials({
+            dni: data.dni,
+            password: data.password_plano || formData.password,
+            nombre: data.nombre_completo
+          });
+          setIsSuccessModalOpen(true);
+          showNotification('Usuario creado correctamente.', 'success');
+        } else {
+          showNotification('Usuario actualizado correctamente.', 'success');
+        }
       } else {
         const errorData = await res.json();
-        alert(`Error al guardar: ${JSON.stringify(errorData)}`);
+        showNotification(`Error al guardar: ${JSON.stringify(errorData)}`, 'error');
       }
     } catch (err) {
-      console.error('Error saving usuario:', err);
+      console.error('Error saving user:', err);
+      showNotification('No se pudo realizar la acción. Verifique los datos.', 'error');
     }
   };
 
@@ -245,14 +298,15 @@ const Usuarios = () => {
       });
 
       if (res.ok) {
-        alert('Contraseña actualizada con éxito');
-        handleClosePasswordModal();
+        showNotification('Contraseña actualizada correctamente.', 'success');
+        setIsPasswordModalOpen(false);
+        setPasswordData({ password: '', debe_cambiar_password: true });
       } else {
-        const errorData = await res.json();
-        alert(`Error: ${JSON.stringify(errorData)}`);
+        showNotification('Error al cambiar la contraseña.', 'error');
       }
     } catch (err) {
-      console.error('Error changing password:', err);
+      console.error('Error updating password:', err);
+      showNotification('No se pudo realizar la acción.', 'error');
     }
   };
 
@@ -270,11 +324,13 @@ const Usuarios = () => {
 
       if (res.ok) {
         fetchData();
+        showNotification('Usuario actualizado correctamente.', 'success');
       } else {
-        alert('Error al cambiar el estado del usuario');
+        showNotification('Error al actualizar el estado del usuario.', 'error');
       }
     } catch (err) {
-      console.error('Error toggling active state:', err);
+      console.error('Error deleting user:', err);
+      showNotification('No se pudo realizar la acción.', 'error');
     }
   };
 
@@ -536,10 +592,11 @@ const Usuarios = () => {
                     <option value="">Seleccione un Rol</option>
                     {roles
                       .filter(rol => {
-                        const userRole = userProfile?.rol_info?.codigo;
-                        if (userRole === 'SUPERADMIN') return true;
-                        if (userRole === 'GERENTE') {
-                          return ['OPERADOR', 'ASESOR'].includes(rol.codigo);
+                        const userRole = userProfile?.rol_info?.codigo?.toUpperCase() || userProfile?.rol_info?.nombre?.toUpperCase() || '';
+                        if (userRole.includes('ADMIN') || userRole === 'SUPERADMIN') return true;
+                        if (userRole.includes('GERENTE') || userRole.includes('SUPERVISOR')) {
+                          const targetRol = (rol.codigo || rol.nombre || '').toUpperCase();
+                          return ['OPERADOR', 'ASESOR'].includes(targetRol);
                         }
                         return false;
                       })
@@ -558,6 +615,42 @@ const Usuarios = () => {
                   </select>
                 </div>
               </div>
+
+              {/* Selector Dinámico para Gerentes */}
+              {roles.find(r => r.id == formData.rol)?.nombre?.toLowerCase().includes('gerente') && (
+                <div className="form-group">
+                  <label>Sedes Autorizadas (Multiselección) *</label>
+                  <div className="sede-selection-container">
+                    <div className="selection-header-info">
+                      <h4>Selecciona las sedes adicionales</h4>
+                      <span className="badge-count">
+                        {(formData.sedes_ids || []).length} seleccionadas
+                      </span>
+                    </div>
+                    
+                    <div className="sede-chips-grid">
+                      {sedes.map(sede => {
+                        const isCentral = parseInt(formData.sede) === sede.id;
+                        const isSelected = (formData.sedes_ids || []).includes(sede.id) || isCentral;
+                        
+                        return (
+                          <div 
+                            key={sede.id} 
+                            className={`sede-chip-item ${isSelected ? 'selected' : ''} ${isCentral ? 'is_central' : ''}`}
+                            onClick={() => !isCentral && toggleSede(sede.id)}
+                          >
+                            {isCentral && <span className="central-badge">Central</span>}
+                            <div className="chip-icon-wrapper">
+                              <MapPin size={16} />
+                            </div>
+                            <span className="sede-chip-name">{sede.nombre}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="form-group">
                 <label>Observación</label>
@@ -582,8 +675,17 @@ const Usuarios = () => {
                     <span>Usuario Activo</span>
                   </label>
                 </div>
-                
-
+                <div className="form-group checkbox-group">
+                  <label className="checkbox-label">
+                    <input 
+                      type="checkbox" 
+                      name="debe_cambiar_password"
+                      checked={formData.debe_cambiar_password} 
+                      onChange={handleInputChange} 
+                    />
+                    <span>Exigir cambio de contraseña</span>
+                  </label>
+                </div>
               </div>
 
               <div className="modal-footer">
@@ -602,7 +704,7 @@ const Usuarios = () => {
       {/* Modal de Cambio de Contraseña */}
       {isPasswordModalOpen && (
         <div className="modal-overlay">
-          <div className="modal-content">
+          <div className="modal-content modal-large">
             <div className="modal-header">
               <h2>Cambiar Contraseña</h2>
               <button className="btn-icon" onClick={handleClosePasswordModal}>
@@ -647,6 +749,40 @@ const Usuarios = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Modal de Éxito al Crear Usuario */}
+      {isSuccessModalOpen && (
+        <div className="modal-overlay">
+          <div className="modal-content text-center">
+            <div className="modal-header justify-center">
+              <div className="success-icon-large">
+                <CheckCircle size={48} className="text-success" />
+              </div>
+            </div>
+            <h2 className="mt-4">¡Usuario Creado con Éxito!</h2>
+            <p className="text-muted mb-6">Comparte estas credenciales con el trabajador:</p>
+            
+            <div className="credentials-box">
+              <div className="credential-item">
+                <span>DNI / Usuario:</span>
+                <strong>{newCredentials?.dni}</strong>
+              </div>
+              <div className="credential-item">
+                <span>Contraseña Temporal:</span>
+                <strong>{newCredentials?.password}</strong>
+              </div>
+            </div>
+
+            <div className="modal-footer justify-center mt-6">
+              <button 
+                className="btn btn-primary w-full" 
+                onClick={() => setIsSuccessModalOpen(false)}
+              >
+                Entendido
+              </button>
+            </div>
           </div>
         </div>
       )}

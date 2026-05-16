@@ -14,20 +14,23 @@ const useWebSockets = (onMessageReceived) => {
         const token = localStorage.getItem('access_token');
         if (!token) return;
 
-        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
-        const wsUrl = API_URL.replace('https://', 'wss://').replace('http://', 'ws://').replace('/api', '/ws/notifications/');
+        const API_URL = import.meta.env.VITE_API_URL || 'https://apifincontrol.finatech.com.pe/api';
+        // Limpiar URL base y asegurar formato de WebSocket
+        const wsBase = API_URL.replace('https://', 'wss://').replace('http://', 'ws://').replace(/\/api\/?$/, '');
+        const wsUrl = `${wsBase}/ws/notifications/`;
         
-        console.log('Conectando a WebSocket:', wsUrl);
+        console.log('Intentando conectar a WebSocket:', wsUrl);
         
         const socket = new WebSocket(`${wsUrl}?token=${token}`);
 
         socket.onopen = () => {
-            console.log('WebSocket Conectado');
+            console.log('WebSocket Conectado exitosamente');
         };
 
         socket.onmessage = (event) => {
             try {
                 const data = JSON.parse(event.data);
+                console.log('Mensaje recibido de WebSocket:', data);
                 if (callbackRef.current) {
                     callbackRef.current(data);
                 }
@@ -36,8 +39,8 @@ const useWebSockets = (onMessageReceived) => {
             }
         };
 
-        socket.onclose = () => {
-            console.log('WebSocket Desconectado. Reintentando en 5s...');
+        socket.onclose = (event) => {
+            console.warn(`WebSocket Desconectado (Code: ${event.code}). Reintentando en 5s...`);
             reconnectTimeoutRef.current = setTimeout(connect, 5000);
         };
 
