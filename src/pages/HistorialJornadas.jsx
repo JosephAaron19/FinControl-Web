@@ -19,6 +19,28 @@ import './HistorialJornadas.css';
 
 const API_URL = import.meta.env.VITE_API_URL;
 
+const getActTypeClass = (type) => {
+  return "px-2 py-0.5 text-xs font-bold rounded uppercase tracking-wider bg-purple-500/10 text-purple-400 border border-purple-500/20";
+};
+
+const getActStatusClass = (status) => {
+  const s = (status || '').toLowerCase();
+  if (s.includes('finalizada') || s.includes('completa') || s.includes('completada')) {
+    return "px-2 py-0.5 text-xs font-bold rounded uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
+  }
+  if (s.includes('proceso') || s.includes('pendiente') || s.includes('curso')) {
+    return "px-2 py-0.5 text-xs font-bold rounded uppercase tracking-wider bg-amber-500/10 text-amber-400 border border-amber-500/20";
+  }
+  if (s.includes('cancelada') || s.includes('anulada') || s.includes('suspendida')) {
+    return "px-2 py-0.5 text-xs font-bold rounded uppercase tracking-wider bg-rose-500/10 text-rose-400 border border-rose-500/20";
+  }
+  return "px-2 py-0.5 text-xs font-bold rounded uppercase tracking-wider bg-slate-500/10 text-slate-400 border border-slate-500/20";
+};
+
+const getActResultClass = (result) => {
+  return "px-2 py-0.5 text-xs font-bold rounded uppercase tracking-wider bg-blue-500/10 text-blue-400 border border-blue-500/20";
+};
+
 const HistorialJornadas = () => {
   const navigate = useNavigate();
   const [historial, setHistorial] = useState([]);
@@ -357,7 +379,7 @@ const HistorialJornadas = () => {
       window.google.maps.event.removeListener(listener);
     });
 
-  }, [googleMapsLoaded, trackingRecorrido]);
+  }, [googleMapsLoaded, trackingRecorrido, jornadaDetalle, loadingDetail, loadingTracking]);
 
   const handleUserSelect = (user) => {
     setSelectedUser(user);
@@ -669,14 +691,6 @@ const HistorialJornadas = () => {
                             </span>
                           )}
                         </div>
-                        {jornadaDetalle.puntos_gps?.length > 0 && (
-                          <button 
-                            className="btn btn-secondary btn-sm mt-2" 
-                            onClick={() => window.open(`${API_URL}/historial-jornadas/${jornadaDetalle.id}/tracking-map/`, '_blank')}
-                          >
-                            <MapPin size={16} /> Ver Mapa de Recorrido
-                          </button>
-                        )}
                       </div>
                     </div>
 
@@ -744,107 +758,185 @@ const HistorialJornadas = () => {
                     </div>
                   </div>
 
-                  {/* Field Activities for Advisors */}
-                  {jornadaDetalle.rol_codigo === 'ASESOR' && (
-                    <div className="card activities-history-card">
-                      <div className="card-header-flex">
-                        <h2>Actividades de Campo</h2>
-                        <span className="badge-count">{jornadaDetalle.actividades_campo?.length || 0}</span>
-                      </div>
-                      
-                      {(!jornadaDetalle.actividades_campo || jornadaDetalle.actividades_campo.length === 0) ? (
-                        <p className="empty-msg">No se registraron actividades de campo en esta jornada.</p>
-                      ) : (
-                        <div className="timeline-v2">
-                          {jornadaDetalle.actividades_campo.map((act, idx) => (
-                            <div key={idx} className="timeline-v2-item activity-history-item">
-                              <div className="time-col">
-                                {formatTime(act.hora_inicio_actividad)}
-                                <br />
-                                <span className="text-xs text-muted">
-                                  {act.hora_fin_actividad ? formatTime(act.hora_fin_actividad) : '...'}
-                                </span>
-                              </div>
-                              <div className="marker-col">
-                                <div className={`marker-dot ${act.estado_actividad?.toLowerCase() === 'finalizada' ? 'success' : 'warning'}`}></div>
-                              </div>
-                              <div className="content-col">
-                                <div className="flex justify-between items-start">
-                                  <div>
-                                    <span className="act-type-tag">{act.tipo_actividad}</span>
-                                    <h4>{act.titulo}</h4>
-                                  </div>
-                                  <span className={`status-badge small ${act.estado_actividad?.toLowerCase()}`}>
-                                    {act.estado_actividad}
-                                  </span>
-                                </div>
-                                <p className="text-sm mt-2">{act.descripcion}</p>
-                                <div className="act-meta mt-2">
-                                  <span><strong>Cliente:</strong> {act.cliente_nombre}</span>
-                                  <span><strong>Resultado:</strong> {act.resultado_actividad || '-'}</span>
-                                </div>
-                                
-                                {(act.evidencia_inicio_url || act.evidencia_fin_url) && (
-                                  <div className="act-evidence mt-3">
-                                    {act.evidencia_inicio_url && (
-                                      <img 
-                                        src={act.evidencia_inicio_url.startsWith('http') ? act.evidencia_inicio_url : `${API_URL.replace('/api', '')}${act.evidencia_inicio_url}`} 
-                                        alt="Evidencia Inicio" 
-                                        className="evidence-thumb"
-                                        onClick={() => window.open(act.evidencia_inicio_url.startsWith('http') ? act.evidencia_inicio_url : `${API_URL.replace('/api', '')}${act.evidencia_inicio_url}`, '_blank')}
-                                      />
-                                    )}
-                                    {act.evidencia_fin_url && (
-                                      <img 
-                                        src={act.evidencia_fin_url.startsWith('http') ? act.evidencia_fin_url : `${API_URL.replace('/api', '')}${act.evidencia_fin_url}`} 
-                                        alt="Evidencia Fin" 
-                                        className="evidence-thumb"
-                                        onClick={() => window.open(act.evidencia_fin_url.startsWith('http') ? act.evidencia_fin_url : `${API_URL.replace('/api', '')}${act.evidencia_fin_url}`, '_blank')}
-                                      />
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
+
 
                   {/* El listado simple de puntos se ha reemplazado por la visualización del mapa interactivo al final de la página */}
                 </div>
 
-                {/* Right Column: Incidents & Map placeholder */}
+                {/* Right Column: Incidents & Advisor Activities */}
                 <div className="detail-side">
                   <div className="card incidents-list-card">
-                    <h2>Reportes e Incidencias</h2>
-                    {jornadaDetalle.incidencias.length > 0 ? (
-                      <div className="incidents-stack">
-                        {jornadaDetalle.incidencias?.map((inc, idx) => (
-                          <div key={idx} className="incident-card-v2">
-                            <div className="inc-header">
-                              <strong>{inc.tipo_incidencia_0?.nombre || 'Incidencia'}</strong>
-                              <span className="inc-time">{formatTime(inc.fecha_hora_reporte)}</span>
-                            </div>
-                            <p>{inc.descripcion}</p>
-                            {inc.foto && (
-                              <div className="inc-media">
-                                <img 
-                                  src={inc.foto.startsWith('http') ? inc.foto : `${API_URL.replace('/api', '')}${inc.foto}`} 
-                                  alt="Evidencia" 
-                                  onClick={() => window.open(inc.foto.startsWith('http') ? inc.foto : `${API_URL.replace('/api', '')}${inc.foto}`, '_blank')} 
-                                />
+                    <h2 className="text-base font-bold text-white border-b border-slate-700/80 pb-3 mb-6 tracking-wide uppercase">
+                      {((jornadaDetalle.rol_codigo || '').toUpperCase() === 'ASESOR') ? "Incidencias y Actividades de Campo" : "Reportes e Incidencias"}
+                    </h2>
+                    
+                    {((jornadaDetalle.rol_codigo || '').toUpperCase() !== 'ASESOR') ? (
+                      /* OPERADOR ROLE */
+                      jornadaDetalle.incidencias && jornadaDetalle.incidencias.length > 0 ? (
+                        <div className="incidents-stack">
+                          {jornadaDetalle.incidencias.map((inc, idx) => (
+                            <div key={idx} className="incident-card-v2">
+                              <div className="inc-header">
+                                <strong>{inc.tipo_incidencia_0?.nombre || inc.tipo_incidencia || 'Incidencia'}</strong>
+                                <span className="inc-time">{formatTime(inc.fecha_hora_reporte)}</span>
                               </div>
+                              <p>{inc.descripcion}</p>
+                              <div className="inc-meta-row mt-2 text-xs text-muted flex gap-2">
+                                <span><strong>Estado:</strong> {inc.estado_revision}</span>
+                              </div>
+                              {inc.foto && (
+                                <div className="inc-media">
+                                  <img 
+                                    src={inc.foto.startsWith('http') ? inc.foto : `${API_URL.replace('/api', '')}${inc.foto}`} 
+                                    alt="Evidencia" 
+                                    onClick={() => window.open(inc.foto.startsWith('http') ? inc.foto : `${API_URL.replace('/api', '')}${inc.foto}`, '_blank')} 
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="empty-msg">No se reportaron incidencias.</p>
+                      )
+                    ) : (
+                      /* ASESOR ROLE */
+                      /* ASESOR ROLE */
+                      ((!jornadaDetalle.incidencias || jornadaDetalle.incidencias.length === 0) && 
+                       (!jornadaDetalle.actividades_campo || jornadaDetalle.actividades_campo.length === 0)) ? (
+                        <p className="empty-msg-large">
+                          No se reportaron incidencias ni actividades en esta jornada.
+                        </p>
+                      ) : (
+                        <div className="incidents-activities-stack">
+                          {/* BLOCK 1: INCIDENCIAS */}
+                          <div className="incidents-block">
+                            <h3 className="section-subtitle">Incidencias</h3>
+                            {jornadaDetalle.incidencias && jornadaDetalle.incidencias.length > 0 ? (
+                              <div className="incidents-stack">
+                                {jornadaDetalle.incidencias.map((inc, idx) => (
+                                  <div key={idx} className="incident-card-premium">
+                                    <div className="incident-card-header">
+                                      <strong className="incident-title">{inc.tipo_incidencia_0?.nombre || inc.tipo_incidencia || 'Incidencia'}</strong>
+                                      <span className="incident-time">{formatTime(inc.fecha_hora_reporte)}</span>
+                                    </div>
+                                    <div className="incident-card-body">
+                                      <div className="incident-detail-item">
+                                        <span className="incident-detail-label">Descripción</span>
+                                        <span className="incident-detail-value">{inc.descripcion}</span>
+                                      </div>
+                                      <div className="incident-detail-item inline-flex">
+                                        <span className="incident-detail-label">Estado:</span>
+                                        <span className="incident-status-badge">{inc.estado_revision}</span>
+                                      </div>
+                                    </div>
+                                    {inc.foto && (
+                                      <div className="incident-media-box">
+                                        <span className="incident-media-label">Evidencia</span>
+                                        <img 
+                                          src={inc.foto.startsWith('http') ? inc.foto : `${API_URL.replace('/api', '')}${inc.foto}`} 
+                                          alt="Evidencia" 
+                                          className="incident-media-thumb"
+                                          onClick={() => window.open(inc.foto.startsWith('http') ? inc.foto : `${API_URL.replace('/api', '')}${inc.foto}`, '_blank')} 
+                                        />
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="empty-state-message">No se reportaron incidencias.</p>
                             )}
                           </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="empty-msg">No se reportaron incidencias.</p>
+
+                          {/* BLOCK 2: ACTIVIDADES DE CAMPO */}
+                          <div className="activities-block">
+                            <h3 className="section-subtitle">Actividades de Campo</h3>
+                            {jornadaDetalle.actividades_campo && jornadaDetalle.actividades_campo.length > 0 ? (
+                              <div className="activities-stack">
+                                {jornadaDetalle.actividades_campo.map((act, idx) => (
+                                  <div key={idx} className="activity-card-premium">
+                                    {/* HEADER: BADGES ONLY */}
+                                    <div className="activity-card-header">
+                                      <span className={getActTypeClass(act.tipo_actividad)}>{act.tipo_actividad}</span>
+                                      <span className={getActStatusClass(act.estado_actividad)}>{act.estado_actividad}</span>
+                                      {act.resultado_actividad && (
+                                        <span className={getActResultClass(act.resultado_actividad)}>{act.resultado_actividad}</span>
+                                      )}
+                                    </div>
+
+                                    {/* DETALLES DE LA ACTIVIDAD */}
+                                    <div className="activity-card-body">
+                                      {act.cliente_nombre && (
+                                        <div className="activity-detail-item">
+                                          <span className="activity-detail-label">Cliente / Lugar</span>
+                                          <span className="activity-detail-value main-highlight">{act.cliente_nombre}</span>
+                                        </div>
+                                      )}
+
+                                      <div className="activity-detail-item">
+                                        <span className="activity-detail-label">Descripción</span>
+                                        <span className="activity-detail-value description-text">{act.descripcion}</span>
+                                      </div>
+
+                                      <div className="activity-detail-item">
+                                        <span className="activity-detail-label">Inicio</span>
+                                        <span className="activity-detail-value time-value">{formatTime(act.hora_inicio_actividad)}</span>
+                                      </div>
+
+                                      <div className="activity-detail-item">
+                                        <span className="activity-detail-label">Fin</span>
+                                        <span className="activity-detail-value time-value">{act.hora_fin_actividad ? formatTime(act.hora_fin_actividad) : '--:--'}</span>
+                                      </div>
+
+                                      {act.observacion && (
+                                        <div className="activity-detail-item">
+                                          <span className="activity-detail-label">Observación</span>
+                                          <span className="activity-detail-value observation-box">{act.observacion}</span>
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    {/* EVIDENCIA */}
+                                    {(act.evidencia_inicio_url || act.evidencia_fin_url) && (
+                                      <div className="activity-evidence-wrapper">
+                                        {act.evidencia_inicio_url && (
+                                          <div className="evidence-item">
+                                            <span className="evidence-label">Evidencia Inicio</span>
+                                            <img 
+                                              src={act.evidencia_inicio_url.startsWith('http') ? act.evidencia_inicio_url : `${API_URL.replace('/api', '')}${act.evidencia_inicio_url}`} 
+                                              alt="Evidencia Inicio" 
+                                              className="evidence-thumb"
+                                              onClick={() => window.open(act.evidencia_inicio_url.startsWith('http') ? act.evidencia_inicio_url : `${API_URL.replace('/api', '')}${act.evidencia_inicio_url}`, '_blank')}
+                                            />
+                                          </div>
+                                        )}
+                                        {act.evidencia_fin_url && (
+                                          <div className="evidence-item">
+                                            <span className="evidence-label">Evidencia Fin</span>
+                                            <img 
+                                              src={act.evidencia_fin_url.startsWith('http') ? act.evidencia_fin_url : `${API_URL.replace('/api', '')}${act.evidencia_fin_url}`} 
+                                              alt="Evidencia Fin" 
+                                              className="evidence-thumb"
+                                              onClick={() => window.open(act.evidencia_fin_url.startsWith('http') ? act.evidencia_fin_url : `${API_URL.replace('/api', '')}${act.evidencia_fin_url}`, '_blank')}
+                                            />
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="empty-state-message">No se registraron actividades de campo.</p>
+                            )}
+                          </div>
+                        </div>
+                      )
                     )}
                   </div>
                 </div>
+
               </div>
 
               {/* Seccion Recorrido GPS Premium */}
@@ -877,7 +969,14 @@ const HistorialJornadas = () => {
                   <div className="gps-section-layout">
                     {/* Map Container */}
                     <div className="google-map-wrapper">
-                      <div id="google-map-container" className="google-map-canvas"></div>
+                      <div id="google-map-container" className="google-map-canvas">
+                        {!googleMapsLoaded && (
+                          <div className="loading-state" style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1rem' }}>
+                            <div className="spinner"></div>
+                            <p>Cargando Google Maps...</p>
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     {/* Metrics Sidebar */}

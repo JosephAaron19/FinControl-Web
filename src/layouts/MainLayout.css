@@ -1,6 +1,7 @@
 .main-layout {
   display: flex;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
   background-color: var(--color-bg-base);
 }
 
@@ -8,8 +9,9 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
-  height: 100vh;
+  overflow: hidden;
+  height: 125vh; /* 100vh / 0.8 to counteract zoom: 0.8 */
+  width: 125%; /* 100% / 0.8 to counteract zoom: 0.8 */
   zoom: 0.8; /* Efecto de zoom del 80% (alta densidad) para diseño premium ultra compacto */
 }
 
@@ -63,4 +65,5 @@
   flex-direction: column;
   gap: 2rem;
   flex: 1;
+  overflow-y: auto;
 }
