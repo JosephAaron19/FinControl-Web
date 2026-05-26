@@ -1,5 +1,9 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
+html {
+  font-size: 13.5px; /* Escala global de ~84% para diseño compacto */
+}
+
 :root {
   /* Brand Colors - Financial Theme */
   --color-primary: #10b981;
@@ -129,4 +133,27 @@ button {
   border: 1px solid var(--color-border);
   padding: 2rem;
   box-shadow: var(--shadow-lg);
+}
+
+/* Modal Overlay — Global base rule with 80% zoom compensation */
+/* width/height 125vw/vh counteract the zoom:0.8 on .main-content so the backdrop covers 100% of screen */
+.modal-overlay {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 125vw !important;
+  height: 125vh !important;
+  background-color: rgba(0, 0, 0, 0.75) !important;
+  backdrop-filter: blur(6px) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  z-index: 9999 !important;
+}
+
+/* Global counter-zoom: modals inherit zoom:0.8 from .main-content.
+   zoom:1.25 = 1/0.8 = restores elements to 100% normal size inside every modal. */
+.modal-overlay .modal-content,
+.modal-overlay .hm-shell {
+  zoom: 1.25;
 }

@@ -1,6 +1,6 @@
 /* Sidebar Styles */
 .sidebar {
-  width: 260px;
+  width: 16.25rem; /* 260px equivalente, escala proporcionalmente */
   background-color: var(--color-bg-surface);
   border-right: 1px solid var(--color-border);
   display: flex;
@@ -17,8 +17,8 @@
 }
 
 .logo-small {
-  width: 32px;
-  height: 32px;
+  width: 2rem; /* 32px equivalente */
+  height: 2rem; /* 32px equivalente */
   background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
   border-radius: 8px;
   box-shadow: var(--shadow-glow);

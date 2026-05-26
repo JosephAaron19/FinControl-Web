@@ -30,6 +30,12 @@ const HistorialJornadas = () => {
   const [selectedJornadaId, setSelectedJornadaId] = useState(null);
   const [jornadaDetalle, setJornadaDetalle] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+
+  // GPS tracking states
+  const [trackingRecorrido, setTrackingRecorrido] = useState(null);
+  const [loadingTracking, setLoadingTracking] = useState(false);
+  const [mapError, setMapError] = useState(null);
+  const [googleMapsLoaded, setGoogleMapsLoaded] = useState(false);
   
   // Filters for history
   const [filters, setFilters] = useState({
@@ -62,6 +68,30 @@ const HistorialJornadas = () => {
       setLoading(false);
     }
   }, [filters]);
+
+  const fetchTrackingRecorrido = useCallback(async (jornadaId) => {
+    if (!jornadaId) return;
+    setLoadingTracking(true);
+    setMapError(null);
+    const token = localStorage.getItem('access_token');
+    try {
+      const res = await fetch(`${API_URL}/tracking/recorrido-jornada/${jornadaId}/`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setTrackingRecorrido(data);
+      } else {
+        const errorData = await res.json().catch(() => ({}));
+        setMapError(errorData.error || 'No se pudo obtener el recorrido de esta jornada.');
+      }
+    } catch (err) {
+      console.error('Error fetching tracking recorrido:', err);
+      setMapError('Error al conectar con el servidor.');
+    } finally {
+      setLoadingTracking(false);
+    }
+  }, []);
 
   const fetchJornadaDetalle = useCallback(async (jornadaId) => {
     if (!jornadaId) return;
@@ -108,15 +138,226 @@ const HistorialJornadas = () => {
         fetchHistorial(selectedUser.id);
       } else if (selectedJornadaId) {
         fetchJornadaDetalle(selectedJornadaId);
+        fetchTrackingRecorrido(selectedJornadaId);
       }
     }
-  }, [selectedUser, selectedJornadaId, fetchHistorial, fetchJornadaDetalle]);
+  }, [selectedUser, selectedJornadaId, fetchHistorial, fetchJornadaDetalle, fetchTrackingRecorrido]);
 
   useWebSockets(onSocketMessage);
 
   useEffect(() => {
     fetchUsuarios();
   }, [fetchUsuarios]);
+
+  // Dynamically load Google Maps script
+  useEffect(() => {
+    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+    if (!apiKey) {
+      console.error('VITE_GOOGLE_MAPS_API_KEY no está definido en el archivo .env');
+      return;
+    }
+
+    if (window.google && window.google.maps) {
+      setGoogleMapsLoaded(true);
+      return;
+    }
+
+    const existingScript = document.getElementById('google-maps-script');
+    if (existingScript) {
+      const handleLoad = () => setGoogleMapsLoaded(true);
+      existingScript.addEventListener('load', handleLoad);
+      return () => existingScript.removeEventListener('load', handleLoad);
+    }
+
+    const script = document.createElement('script');
+    script.id = 'google-maps-script';
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=geometry&loading=async`;
+    script.async = true;
+    script.defer = true;
+    script.onload = () => setGoogleMapsLoaded(true);
+    script.onerror = () => console.error('Error al cargar la script de Google Maps');
+    document.head.appendChild(script);
+  }, []);
+
+  // Initialize and draw the Google Map when loaded and recorrido data is ready
+  useEffect(() => {
+    if (!googleMapsLoaded || !trackingRecorrido || !trackingRecorrido.puntos || trackingRecorrido.puntos.length === 0) {
+      return;
+    }
+
+    const mapElement = document.getElementById('google-map-container');
+    if (!mapElement) return;
+
+    const { Sede: mapSede, puntos, Sede_info } = trackingRecorrido;
+    const sede = trackingRecorrido.sede; // matches response from backend
+
+    let mapCenter = { lat: -12.046374, lng: -77.042793 }; // Default (Lima)
+    if (sede && sede.latitud && sede.longitud) {
+      mapCenter = { lat: Number(sede.latitud), lng: Number(sede.longitud) };
+    } else if (puntos.length > 0) {
+      mapCenter = { lat: Number(puntos[0].latitud), lng: Number(puntos[0].longitud) };
+    }
+
+    const map = new window.google.maps.Map(mapElement, {
+      center: mapCenter,
+      zoom: 15,
+      mapTypeControl: true,
+      streetViewControl: false,
+      fullscreenControl: true,
+      styles: [
+        {
+          featureType: "poi",
+          elementType: "labels",
+          stylers: [{ visibility: "off" }]
+        }
+      ]
+    });
+
+    const bounds = new window.google.maps.LatLngBounds();
+
+    // 1. Sede Marker & Geofence
+    if (sede && sede.latitud && sede.longitud) {
+      const sedePos = { lat: Number(sede.latitud), lng: Number(sede.longitud) };
+      bounds.extend(sedePos);
+
+      new window.google.maps.Marker({
+        position: sedePos,
+        map: map,
+        title: `Sede: ${sede.nombre || 'Asignada'}`,
+        icon: {
+          path: window.google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
+          scale: 6,
+          fillColor: "#3B82F6",
+          fillOpacity: 1,
+          strokeColor: "#FFFFFF",
+          strokeWeight: 2,
+        }
+      });
+
+      if (sede.radio_metros) {
+        new window.google.maps.Circle({
+          strokeColor: "#3B82F6",
+          strokeOpacity: 0.8,
+          strokeWeight: 2,
+          fillColor: "#3B82F6",
+          fillOpacity: 0.15,
+          map: map,
+          center: sedePos,
+          radius: Number(sede.radio_metros)
+        });
+      }
+    }
+
+    // 2. Journey Polyline
+    const pathCoordinates = puntos.map(p => {
+      const pos = { lat: Number(p.latitud), lng: Number(p.longitud) };
+      bounds.extend(pos);
+      return pos;
+    });
+
+    new window.google.maps.Polyline({
+      path: pathCoordinates,
+      geodesic: true,
+      strokeColor: "#10B981", // Emerald green
+      strokeOpacity: 0.9,
+      strokeWeight: 4,
+      map: map
+    });
+
+    // 3. Start Marker (Green)
+    if (puntos.length > 0) {
+      const firstPos = { lat: Number(puntos[0].latitud), lng: Number(puntos[0].longitud) };
+      new window.google.maps.Marker({
+        position: firstPos,
+        map: map,
+        title: "Punto Inicial",
+        label: {
+          text: "I",
+          color: "white",
+          fontWeight: "bold"
+        },
+        icon: {
+          path: window.google.maps.SymbolPath.CIRCLE,
+          scale: 9,
+          fillColor: "#059669",
+          fillOpacity: 1,
+          strokeColor: "#FFFFFF",
+          strokeWeight: 2,
+        }
+      });
+    }
+
+    // 4. End Marker (Red)
+    if (puntos.length > 1) {
+      const lastPos = { lat: Number(puntos[puntos.length - 1].latitud), lng: Number(puntos[puntos.length - 1].longitud) };
+      new window.google.maps.Marker({
+        position: lastPos,
+        map: map,
+        title: "Última Ubicación",
+        label: {
+          text: "F",
+          color: "white",
+          fontWeight: "bold"
+        },
+        icon: {
+          path: window.google.maps.SymbolPath.CIRCLE,
+          scale: 9,
+          fillColor: "#DC2626",
+          fillOpacity: 1,
+          strokeColor: "#FFFFFF",
+          strokeWeight: 2,
+        }
+      });
+    }
+
+    // 5. Outside of Zone Markers (Orange dot circles with clickable popups)
+    puntos.forEach(p => {
+      if (p.es_fuera_de_zona) {
+        const outPos = { lat: Number(p.latitud), lng: Number(p.longitud) };
+        const timeStr = new Date(p.fecha_hora).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+        const outMarker = new window.google.maps.Marker({
+          position: outPos,
+          map: map,
+          title: `Fuera de zona: ${timeStr}`,
+          icon: {
+            path: window.google.maps.SymbolPath.CIRCLE,
+            scale: 5.5,
+            fillColor: "#EF4444", // Red/orange
+            fillOpacity: 0.95,
+            strokeColor: "#FFFFFF",
+            strokeWeight: 1.5,
+          }
+        });
+
+        const infoWindow = new window.google.maps.InfoWindow({
+          content: `
+            <div style="font-family: Inter, sans-serif; padding: 6px; font-size: 13px; color: #1F2937;">
+              <strong style="color: #EF4444; display: block; margin-bottom: 4px;">Alerta: Fuera de Zona</strong>
+              <strong>Hora:</strong> ${timeStr}<br/>
+              <strong>Distancia:</strong> ${Math.round(p.distancia_sede_metros)} m de la sede<br/>
+              <strong>Batería:</strong> ${p.bateria_porcentaje !== null ? p.bateria_porcentaje + '%' : 'N/A'}<br/>
+              <strong>Precisión:</strong> ${p.precision_metros !== null ? Math.round(p.precision_metros) + ' m' : 'N/A'}
+            </div>
+          `
+        });
+
+        outMarker.addListener('click', () => {
+          infoWindow.open(map, outMarker);
+        });
+      }
+    });
+
+    // Auto fit map bounds
+    map.fitBounds(bounds);
+
+    // Guard listener to prevent overzooming on single points
+    const listener = window.google.maps.event.addListener(map, "idle", () => {
+      if (map.getZoom() > 17) map.setZoom(16);
+      window.google.maps.event.removeListener(listener);
+    });
+
+  }, [googleMapsLoaded, trackingRecorrido]);
 
   const handleUserSelect = (user) => {
     setSelectedUser(user);
@@ -126,6 +367,7 @@ const HistorialJornadas = () => {
   const handleJornadaSelect = (jornadaId) => {
     setSelectedJornadaId(jornadaId);
     fetchJornadaDetalle(jornadaId);
+    fetchTrackingRecorrido(jornadaId);
   };
 
   const handleBackToUsers = () => {
@@ -133,11 +375,15 @@ const HistorialJornadas = () => {
     setHistorial([]);
     setSelectedJornadaId(null);
     setJornadaDetalle(null);
+    setTrackingRecorrido(null);
+    setMapError(null);
   };
 
   const handleBackToHistory = () => {
     setSelectedJornadaId(null);
     setJornadaDetalle(null);
+    setTrackingRecorrido(null);
+    setMapError(null);
   };
 
   const handleFilterChange = (e) => {
@@ -390,7 +636,8 @@ const HistorialJornadas = () => {
             {loadingDetail ? (
               <div className="loading-state"><div className="spinner"></div><p>Cargando detalles...</p></div>
             ) : jornadaDetalle && (
-              <div className="detail-layout">
+              <>
+                <div className="detail-layout">
                 {/* Left Column: Summary & Events */}
                 <div className="detail-main">
                   <div className="card summary-header-card">
@@ -565,36 +812,7 @@ const HistorialJornadas = () => {
                     </div>
                   )}
 
-                  <div className="card gps-points-card">
-                    <div className="card-header-flex">
-                      <h2>Recorrido GPS (Puntos Registrados)</h2>
-                      <span className="badge-count">{jornadaDetalle.puntos_gps?.length || 0} puntos</span>
-                    </div>
-                    <div className="table-responsive max-h-400">
-                      <table className="data-table small">
-                        <thead>
-                          <tr>
-                            <th>Hora</th>
-                            <th>Coordenadas</th>
-                            <th>Estado</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {[...(jornadaDetalle.puntos_gps || [])].reverse().map((p, idx) => (
-                            <tr key={idx} className={p.es_fuera_de_zona ? 'row-alert' : ''}>
-                              <td>{formatTime(p.fecha_hora)}</td>
-                              <td>{parseFloat(p.latitud).toFixed(5)}, {parseFloat(p.longitud).toFixed(5)}</td>
-                              <td>
-                                <span className={`status-badge small ${p.es_fuera_de_zona ? 'invalid' : 'valid'}`}>
-                                  {p.es_fuera_de_zona ? 'Fuera' : 'OK'}
-                                </span>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
+                  {/* El listado simple de puntos se ha reemplazado por la visualización del mapa interactivo al final de la página */}
                 </div>
 
                 {/* Right Column: Incidents & Map placeholder */}
@@ -626,10 +844,108 @@ const HistorialJornadas = () => {
                       <p className="empty-msg">No se reportaron incidencias.</p>
                     )}
                   </div>
-                  
-
                 </div>
               </div>
+
+              {/* Seccion Recorrido GPS Premium */}
+              <div className="card recorrido-gps-card mt-4 animate-in">
+                <div className="card-header-flex">
+                  <h2>Recorrido GPS</h2>
+                  {trackingRecorrido && (
+                    <span className="badge-count">
+                      {trackingRecorrido.resumen.total_puntos} puntos
+                    </span>
+                  )}
+                </div>
+
+                {loadingTracking ? (
+                  <div className="loading-state">
+                    <div className="spinner"></div>
+                    <p>Cargando recorrido GPS...</p>
+                  </div>
+                ) : mapError ? (
+                  <div className="empty-state text-center p-8">
+                    <AlertCircle size={40} className="text-danger mb-2" />
+                    <p className="text-gray-600">{mapError}</p>
+                  </div>
+                ) : !trackingRecorrido || trackingRecorrido.puntos.length === 0 ? (
+                  <div className="empty-state text-center p-8">
+                    <MapPin size={40} className="text-muted mb-2" />
+                    <p className="text-gray-600">No se registraron puntos GPS para esta jornada.</p>
+                  </div>
+                ) : (
+                  <div className="gps-section-layout">
+                    {/* Map Container */}
+                    <div className="google-map-wrapper">
+                      <div id="google-map-container" className="google-map-canvas"></div>
+                    </div>
+
+                    {/* Metrics Sidebar */}
+                    <div className="gps-metrics-sidebar">
+                      <h3>Resumen del Recorrido</h3>
+                      
+                      <div className="gps-metric-tile">
+                        <span className="tile-label">Total de puntos registrados</span>
+                        <span className="tile-value">{trackingRecorrido.resumen.total_puntos}</span>
+                      </div>
+
+                      <div className="gps-metric-tile">
+                        <span className="tile-label">Puntos fuera de zona</span>
+                        <span className={`tile-value ${trackingRecorrido.resumen.total_fuera_de_zona > 0 ? 'text-warning font-bold' : ''}`}>
+                          {trackingRecorrido.resumen.total_fuera_de_zona}
+                        </span>
+                      </div>
+
+                      {trackingRecorrido.resumen.primera_ubicacion && (
+                        <div className="gps-metric-tile">
+                          <span className="tile-label">Primera ubicación</span>
+                          <span className="tile-value subtext">
+                            <strong>{formatTime(trackingRecorrido.resumen.primera_ubicacion.fecha_hora)}</strong>
+                            <span className="coordinates">
+                              ({trackingRecorrido.resumen.primera_ubicacion.latitud.toFixed(5)}, {trackingRecorrido.resumen.primera_ubicacion.longitud.toFixed(5)})
+                            </span>
+                          </span>
+                        </div>
+                      )}
+
+                      {trackingRecorrido.resumen.ultima_ubicacion && (
+                        <div className="gps-metric-tile">
+                          <span className="tile-label">Última ubicación</span>
+                          <span className="tile-value subtext">
+                            <strong>{formatTime(trackingRecorrido.resumen.ultima_ubicacion.fecha_hora)}</strong>
+                            <span className="coordinates">
+                              ({trackingRecorrido.resumen.ultima_ubicacion.latitud.toFixed(5)}, {trackingRecorrido.resumen.ultima_ubicacion.longitud.toFixed(5)})
+                            </span>
+                          </span>
+                        </div>
+                      )}
+
+                      {trackingRecorrido.resumen.ultima_ubicacion && (
+                        <div className="gps-two-column">
+                          {trackingRecorrido.resumen.ultima_ubicacion.bateria_porcentaje !== null && (
+                            <div className="gps-metric-tile">
+                              <span className="tile-label">Batería última</span>
+                              <span className="tile-value font-semibold">
+                                {trackingRecorrido.resumen.ultima_ubicacion.bateria_porcentaje}%
+                              </span>
+                            </div>
+                          )}
+                          
+                          {trackingRecorrido.resumen.ultima_ubicacion.precision_metros !== null && (
+                            <div className="gps-metric-tile">
+                              <span className="tile-label">Precisión última</span>
+                              <span className="tile-value font-semibold">
+                                {Math.round(trackingRecorrido.resumen.ultima_ubicacion.precision_metros)} m
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+              </>
             )}
           </div>
         )}

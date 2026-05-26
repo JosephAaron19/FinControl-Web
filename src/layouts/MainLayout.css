@@ -10,6 +10,7 @@
   flex-direction: column;
   overflow-y: auto;
   height: 100vh;
+  zoom: 0.8; /* Efecto de zoom del 80% (alta densidad) para diseño premium ultra compacto */
 }
 
 .top-header {
@@ -45,8 +46,8 @@
 }
 
 .avatar {
-  width: 40px;
-  height: 40px;
+  width: 2.5rem; /* 40px equivalente, escala proporcionalmente */
+  height: 2.5rem; /* 40px equivalente, escala proporcionalmente */
   background-color: var(--color-primary);
   border-radius: 50%;
   display: flex;
