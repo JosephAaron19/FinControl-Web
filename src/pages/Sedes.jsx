@@ -683,39 +683,44 @@ const Sedes = () => {
 
                 {/* Columna Derecha: Mapa de Google */}
                 <div className="map-column">
-                  <label className="input-label">Ubicación Geográfica en Mapa</label>
-                  
-                  {import.meta.env.VITE_GOOGLE_MAPS_API_KEY ? (
-                    <>
-                      <div className="map-search-container">
-                        <Search size={18} className="map-search-icon" />
-                        <input
-                          ref={searchInputRef}
-                          type="text"
-                          className="map-search-input"
-                          placeholder="Buscar dirección o lugar..."
-                          value={searchInputValue}
-                          onChange={(e) => setSearchInputValue(e.target.value)}
-                        />
+                  <div className="map-card-wrapper card">
+                    <label className="input-label">Ubicación Geográfica en Mapa</label>
+                    <p className="map-help-text">
+                      Busca una dirección o selecciona un punto en el mapa para capturar la ubicación de la sede.
+                    </p>
+                    
+                    {import.meta.env.VITE_GOOGLE_MAPS_API_KEY ? (
+                      <>
+                        <div className="map-search-container">
+                          <Search size={18} className="map-search-icon" />
+                          <input
+                            ref={searchInputRef}
+                            type="text"
+                            className="map-search-input"
+                            placeholder="Buscar dirección o lugar..."
+                            value={searchInputValue}
+                            onChange={(e) => setSearchInputValue(e.target.value)}
+                          />
+                        </div>
+                        
+                        <div className="map-canvas-container">
+                          {!mapsLoaded && (
+                            <div className="map-loading-overlay">
+                              Cargando mapa de Google...
+                            </div>
+                          )}
+                          <div ref={mapContainerRef} className="map-canvas" />
+                        </div>
+                      </>
+                    ) : (
+                      <div className="map-canvas-container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', textAlign: 'center', gap: '0.75rem' }}>
+                        <MapPin size={32} className="text-muted" />
+                        <p className="text-muted text-sm">
+                          Para habilitar el mapa interactivo y el buscador de direcciones, configure la variable <strong>VITE_GOOGLE_MAPS_API_KEY</strong> en su archivo <strong>.env</strong>.
+                        </p>
                       </div>
-                      
-                      <div className="map-canvas-container">
-                        {!mapsLoaded && (
-                          <div className="map-loading-overlay">
-                            Cargando mapa de Google...
-                          </div>
-                        )}
-                        <div ref={mapContainerRef} className="map-canvas" />
-                      </div>
-                    </>
-                  ) : (
-                    <div className="map-canvas-container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', textAlign: 'center', gap: '0.75rem' }}>
-                      <MapPin size={32} className="text-muted" />
-                      <p className="text-muted text-sm">
-                        Para habilitar el mapa interactivo y el buscador de direcciones, configure la variable <strong>VITE_GOOGLE_MAPS_API_KEY</strong> en su archivo <strong>.env</strong>.
-                      </p>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
               </div>
 
