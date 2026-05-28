@@ -284,8 +284,8 @@ const HistorialJornadas = () => {
   // Initialize and draw the Google Map when loaded and recorrido data is ready
   useEffect(() => {
     (async () => {
-      console.log("Map useEffect triggered. googleMapsLoaded:", googleMapsLoaded, "trackingRecorrido:", !!trackingRecorrido, "puntos:", trackingRecorrido?.puntos?.length, "loadingTracking:", loadingTracking);
-      if (!googleMapsLoaded || !trackingRecorrido || !trackingRecorrido.puntos || trackingRecorrido.puntos.length === 0 || loadingTracking) {
+      console.log("Map useEffect triggered. googleMapsLoaded:", googleMapsLoaded, "trackingRecorrido:", !!trackingRecorrido, "loadingTracking:", loadingTracking);
+      if (!googleMapsLoaded || !trackingRecorrido || loadingTracking) {
         return;
       }
 
@@ -294,7 +294,7 @@ const HistorialJornadas = () => {
       if (!mapElement) return;
 
       try {
-        const { puntos } = trackingRecorrido;
+        const puntos = trackingRecorrido.puntos || [];
         const sede = trackingRecorrido.sede; // matches response from backend
 
         // Load AdvancedMarkerElement and PinElement libraries
@@ -384,16 +384,18 @@ const HistorialJornadas = () => {
           return pos;
         });
 
-        console.log("Drawing polyline with points:", pathCoordinates.length);
-        const polyline = new window.google.maps.Polyline({
-          path: pathCoordinates,
-          geodesic: true,
-          strokeColor: "#10B981", // Emerald green
-          strokeOpacity: 0.9,
-          strokeWeight: 4,
-          map: map
-        });
-        polylineRef.current = polyline;
+        if (pathCoordinates.length > 0) {
+          console.log("Drawing polyline with points:", pathCoordinates.length);
+          const polyline = new window.google.maps.Polyline({
+            path: pathCoordinates,
+            geodesic: true,
+            strokeColor: "#10B981", // Emerald green
+            strokeOpacity: 0.9,
+            strokeWeight: 4,
+            map: map
+          });
+          polylineRef.current = polyline;
+        }
 
         // 3. Start Marker (Green circle with 'I')
         if (puntos.length > 0) {
@@ -445,7 +447,7 @@ const HistorialJornadas = () => {
           const userWindow = new window.google.maps.InfoWindow({
             content: `
               <div style="font-family: Inter, sans-serif; padding: 6px; font-size: 13px; color: #1F2937;">
-                <strong style="color: #3B82F6; display: block; margin-bottom: 4px;">Ubicación del Usuario</strong>
+                <strong style="color: #3B82F6; display: block; margin-bottom: 4px;">Ubicación del Colaborador</strong>
                 <strong>Nombre:</strong> ${trackingRecorrido.usuario?.nombre_completo || 'Colaborador'}<br/>
                 <strong>Último reporte:</strong> ${new Date(lastP.fecha_hora).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}<br/>
                 <strong>Batería:</strong> ${lastP.bateria_porcentaje !== null ? lastP.bateria_porcentaje + '%' : 'N/A'}<br/>
@@ -516,14 +518,19 @@ const HistorialJornadas = () => {
         });
 
         // Auto fit map bounds to show path + sede
-        console.log("Fitting map bounds");
-        map.fitBounds(bounds);
+        if (!bounds.isEmpty()) {
+          console.log("Fitting map bounds");
+          map.fitBounds(bounds);
 
-        // Guard listener to prevent overzooming on single points or tight bounds
-        const listener = window.google.maps.event.addListener(map, "idle", () => {
-          if (map.getZoom() > 17) map.setZoom(16);
-          window.google.maps.event.removeListener(listener);
-        });
+          // Guard listener to prevent overzooming on single points or tight bounds
+          const listener = window.google.maps.event.addListener(map, "idle", () => {
+            if (map.getZoom() > 17) map.setZoom(16);
+            window.google.maps.event.removeListener(listener);
+          });
+        } else {
+          // Centrar en un zoom normal si los límites están vacíos
+          map.setZoom(14);
+        }
       } catch (err) {
         console.error("Error in map useEffect:", err);
         setMapError("Error al renderizar el mapa: " + err.message);
@@ -1289,10 +1296,10 @@ const HistorialJornadas = () => {
                     <AlertCircle size={40} className="text-danger mb-2" />
                     <p className="text-gray-600">{mapError}</p>
                   </div>
-                ) : !trackingRecorrido || trackingRecorrido.puntos.length === 0 ? (
+                ) : !trackingRecorrido ? (
                   <div className="empty-state text-center p-8">
                     <MapPin size={40} className="text-muted mb-2" />
-                    <p className="text-gray-600">Aún no se registran puntos GPS para esta jornada.</p>
+                    <p className="text-gray-600">Aún no se recuperan los datos de seguimiento.</p>
                   </div>
                 ) : (
                   <div className="gps-section-layout">
@@ -1306,6 +1313,12 @@ const HistorialJornadas = () => {
                           </div>
                         )}
                       </div>
+                      {(!trackingRecorrido.puntos || trackingRecorrido.puntos.length === 0) && (
+                        <div className="no-gps-points-banner">
+                          <AlertCircle size={16} className="text-warning mr-2" />
+                          <span>Aún no se registran puntos de recorrido GPS para esta jornada.</span>
+                        </div>
+                      )}
                     </div>
 
                     {/* Metrics Sidebar */}

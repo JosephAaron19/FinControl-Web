@@ -1439,5 +1439,25 @@
   }
 }
 
+.no-gps-points-banner {
+  position: absolute;
+  top: 15px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-main);
+  padding: 0.625rem 1.25rem;
+  border-radius: var(--radius-md);
+  font-size: 0.8125rem;
+  display: flex;
+  align-items: center;
+  z-index: 10;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(8px);
+  white-space: nowrap;
+}
 
-
+.no-gps-points-banner span {
+  font-weight: 500;
+}
