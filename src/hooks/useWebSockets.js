@@ -14,7 +14,7 @@ const useWebSockets = (onMessageReceived) => {
         const token = localStorage.getItem('access_token');
         if (!token) return;
 
-        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
+        const API_URL = import.meta.env.VITE_API_URL || 'https://apifincontrol.finatech.com.pe/api';
         // Limpiar URL base y asegurar formato de WebSocket
         const wsBase = API_URL.replace('https://', 'wss://').replace('http://', 'ws://').replace(/\/api\/?$/, '');
         const wsUrl = `${wsBase}/ws/notifications/`;

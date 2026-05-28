@@ -5,7 +5,7 @@ import MainLayout from '../layouts/MainLayout';
 import { useNotification } from '../context/NotificationContext';
 import './Sedes.css';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
+const API_URL = import.meta.env.VITE_API_URL || 'https://apifincontrol.finatech.com.pe/api';
 
 const darkMapStyle = [
   { elementType: 'geometry', stylers: [{ color: '#0f172a' }] },
@@ -138,7 +138,7 @@ const Sedes = () => {
     if (!script) {
       script = document.createElement('script');
       script.id = scriptId;
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&loading=async`;
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,geometry&loading=async`;
       script.async = true;
       script.defer = true;
       script.onload = () => setMapsLoaded(true);

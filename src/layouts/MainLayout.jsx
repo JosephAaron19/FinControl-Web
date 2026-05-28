@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
+import { Menu } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import './MainLayout.css';
 
 const MainLayout = ({ children, title, subtitle }) => {
   const [userName, setUserName] = useState(localStorage.getItem('user_name') || 'Usuario');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -33,12 +35,17 @@ const MainLayout = ({ children, title, subtitle }) => {
 
   return (
     <div className="main-layout">
-      <Sidebar />
+      <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
       <main className="main-content">
         <header className="top-header">
-          <div>
-            <h1 className="page-title">{title}</h1>
-            <p className="page-subtitle">{subtitle}</p>
+          <div className="header-left">
+            <button className="menu-toggle-btn" onClick={() => setIsSidebarOpen(true)} aria-label="Abrir menú">
+              <Menu size={24} />
+            </button>
+            <div>
+              <h1 className="page-title">{title}</h1>
+              <p className="page-subtitle">{subtitle}</p>
+            </div>
           </div>
           <div className="user-profile">
             <div className="avatar">{userName.charAt(0).toUpperCase()}</div>

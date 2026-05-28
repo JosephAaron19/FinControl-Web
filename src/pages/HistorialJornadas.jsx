@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Calendar, 
@@ -58,6 +58,15 @@ const HistorialJornadas = () => {
   const [loadingTracking, setLoadingTracking] = useState(false);
   const [mapError, setMapError] = useState(null);
   const [googleMapsLoaded, setGoogleMapsLoaded] = useState(false);
+  const [lastUpdateTime, setLastUpdateTime] = useState(null);
+
+  // References for Google Map to update dynamically without full re-instantiation
+  const mapInstanceRef = useRef(null);
+  const mapJornadaIdRef = useRef(null);
+  const polylineRef = useRef(null);
+  const markersRef = useRef([]);
+  const circleRef = useRef(null);
+  const mapContainerRef = useRef(null);
   
   // Filters for history
   const [filters, setFilters] = useState({
@@ -91,9 +100,9 @@ const HistorialJornadas = () => {
     }
   }, [filters]);
 
-  const fetchTrackingRecorrido = useCallback(async (jornadaId) => {
+  const fetchTrackingRecorrido = useCallback(async (jornadaId, silent = false) => {
     if (!jornadaId) return;
-    setLoadingTracking(true);
+    if (!silent) setLoadingTracking(true);
     setMapError(null);
     const token = localStorage.getItem('access_token');
     try {
@@ -103,6 +112,7 @@ const HistorialJornadas = () => {
       if (res.ok) {
         const data = await res.json();
         setTrackingRecorrido(data);
+        setLastUpdateTime(new Date());
       } else {
         const errorData = await res.json().catch(() => ({}));
         setMapError(errorData.error || 'No se pudo obtener el recorrido de esta jornada.');
@@ -111,7 +121,7 @@ const HistorialJornadas = () => {
       console.error('Error fetching tracking recorrido:', err);
       setMapError('Error al conectar con el servidor.');
     } finally {
-      setLoadingTracking(false);
+      if (!silent) setLoadingTracking(false);
     }
   }, []);
 
@@ -193,7 +203,7 @@ const HistorialJornadas = () => {
 
     const script = document.createElement('script');
     script.id = 'google-maps-script';
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=geometry&loading=async`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,geometry&loading=async`;
     script.async = true;
     script.defer = true;
     script.onload = () => setGoogleMapsLoaded(true);
@@ -201,185 +211,272 @@ const HistorialJornadas = () => {
     document.head.appendChild(script);
   }, []);
 
+  // Auto-update tracking data every 60 seconds if the workday is in progress
+  useEffect(() => {
+    if (!selectedJornadaId || !trackingRecorrido) return;
+
+    const isEnProceso = trackingRecorrido.jornada?.estado_jornada === 'en_proceso' || 
+                        !trackingRecorrido.jornada?.hora_salida;
+
+    if (!isEnProceso) return;
+
+    const intervalId = setInterval(() => {
+      fetchTrackingRecorrido(selectedJornadaId, true); // Fetch silently in the background
+    }, 60000);
+
+    return () => clearInterval(intervalId);
+  }, [selectedJornadaId, trackingRecorrido, fetchTrackingRecorrido]);
+
   // Initialize and draw the Google Map when loaded and recorrido data is ready
   useEffect(() => {
-    if (!googleMapsLoaded || !trackingRecorrido || !trackingRecorrido.puntos || trackingRecorrido.puntos.length === 0) {
+    console.log("Map useEffect triggered. googleMapsLoaded:", googleMapsLoaded, "trackingRecorrido:", !!trackingRecorrido, "puntos:", trackingRecorrido?.puntos?.length, "loadingTracking:", loadingTracking);
+    if (!googleMapsLoaded || !trackingRecorrido || !trackingRecorrido.puntos || trackingRecorrido.puntos.length === 0 || loadingTracking) {
       return;
     }
 
-    const mapElement = document.getElementById('google-map-container');
+    const mapElement = mapContainerRef.current;
+    console.log("mapElement:", mapElement);
     if (!mapElement) return;
 
-    const { Sede: mapSede, puntos, Sede_info } = trackingRecorrido;
-    const sede = trackingRecorrido.sede; // matches response from backend
+    try {
+      const { puntos } = trackingRecorrido;
+      const sede = trackingRecorrido.sede; // matches response from backend
 
-    let mapCenter = { lat: -12.046374, lng: -77.042793 }; // Default (Lima)
-    if (sede && sede.latitud && sede.longitud) {
-      mapCenter = { lat: Number(sede.latitud), lng: Number(sede.longitud) };
-    } else if (puntos.length > 0) {
-      mapCenter = { lat: Number(puntos[0].latitud), lng: Number(puntos[0].longitud) };
-    }
+      let map = mapInstanceRef.current;
+      const isNewJornada = mapJornadaIdRef.current !== selectedJornadaId;
+      console.log("Map initialization. isNewJornada:", isNewJornada, "existing map:", !!map);
 
-    const map = new window.google.maps.Map(mapElement, {
-      center: mapCenter,
-      zoom: 15,
-      mapTypeControl: true,
-      streetViewControl: false,
-      fullscreenControl: true,
-      styles: [
-        {
-          featureType: "poi",
-          elementType: "labels",
-          stylers: [{ visibility: "off" }]
+      if (isNewJornada || !map) {
+        let mapCenter = { lat: -12.046374, lng: -77.042793 }; // Default (Lima)
+        if (sede && sede.latitud && sede.longitud) {
+          mapCenter = { lat: Number(sede.latitud), lng: Number(sede.longitud) };
+        } else if (puntos.length > 0) {
+          mapCenter = { lat: Number(puntos[0].latitud), lng: Number(puntos[0].longitud) };
         }
-      ]
-    });
 
-    const bounds = new window.google.maps.LatLngBounds();
-
-    // 1. Sede Marker & Geofence
-    if (sede && sede.latitud && sede.longitud) {
-      const sedePos = { lat: Number(sede.latitud), lng: Number(sede.longitud) };
-      bounds.extend(sedePos);
-
-      new window.google.maps.Marker({
-        position: sedePos,
-        map: map,
-        title: `Sede: ${sede.nombre || 'Asignada'}`,
-        icon: {
-          path: window.google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
-          scale: 6,
-          fillColor: "#3B82F6",
-          fillOpacity: 1,
-          strokeColor: "#FFFFFF",
-          strokeWeight: 2,
-        }
-      });
-
-      if (sede.radio_metros) {
-        new window.google.maps.Circle({
-          strokeColor: "#3B82F6",
-          strokeOpacity: 0.8,
-          strokeWeight: 2,
-          fillColor: "#3B82F6",
-          fillOpacity: 0.15,
-          map: map,
-          center: sedePos,
-          radius: Number(sede.radio_metros)
+        console.log("Creating new window.google.maps.Map at center:", mapCenter);
+        map = new window.google.maps.Map(mapElement, {
+          center: mapCenter,
+          zoom: 15,
+          mapTypeControl: true,
+          streetViewControl: false,
+          fullscreenControl: true,
+          styles: [
+            {
+              featureType: "poi",
+              elementType: "labels",
+              stylers: [{ visibility: "off" }]
+            }
+          ]
         });
+        mapInstanceRef.current = map;
+        mapJornadaIdRef.current = selectedJornadaId;
       }
-    }
 
-    // 2. Journey Polyline
-    const pathCoordinates = puntos.map(p => {
-      const pos = { lat: Number(p.latitud), lng: Number(p.longitud) };
-      bounds.extend(pos);
-      return pos;
-    });
+      // Clean old overlays from previous updates
+      if (polylineRef.current) polylineRef.current.setMap(null);
+      if (circleRef.current) circleRef.current.setMap(null);
+      markersRef.current.forEach(m => m.setMap(null));
+      markersRef.current = [];
 
-    new window.google.maps.Polyline({
-      path: pathCoordinates,
-      geodesic: true,
-      strokeColor: "#10B981", // Emerald green
-      strokeOpacity: 0.9,
-      strokeWeight: 4,
-      map: map
-    });
+      const bounds = new window.google.maps.LatLngBounds();
 
-    // 3. Start Marker (Green)
-    if (puntos.length > 0) {
-      const firstPos = { lat: Number(puntos[0].latitud), lng: Number(puntos[0].longitud) };
-      new window.google.maps.Marker({
-        position: firstPos,
-        map: map,
-        title: "Punto Inicial",
-        label: {
-          text: "I",
-          color: "white",
-          fontWeight: "bold"
-        },
-        icon: {
-          path: window.google.maps.SymbolPath.CIRCLE,
-          scale: 9,
-          fillColor: "#059669",
-          fillOpacity: 1,
-          strokeColor: "#FFFFFF",
-          strokeWeight: 2,
-        }
-      });
-    }
+      // 1. Sede Marker & Geofence (Circle)
+      if (sede && sede.latitud && sede.longitud) {
+        const sedePos = { lat: Number(sede.latitud), lng: Number(sede.longitud) };
+        bounds.extend(sedePos);
 
-    // 4. End Marker (Red)
-    if (puntos.length > 1) {
-      const lastPos = { lat: Number(puntos[puntos.length - 1].latitud), lng: Number(puntos[puntos.length - 1].longitud) };
-      new window.google.maps.Marker({
-        position: lastPos,
-        map: map,
-        title: "Última Ubicación",
-        label: {
-          text: "F",
-          color: "white",
-          fontWeight: "bold"
-        },
-        icon: {
-          path: window.google.maps.SymbolPath.CIRCLE,
-          scale: 9,
-          fillColor: "#DC2626",
-          fillOpacity: 1,
-          strokeColor: "#FFFFFF",
-          strokeWeight: 2,
-        }
-      });
-    }
-
-    // 5. Outside of Zone Markers (Orange dot circles with clickable popups)
-    puntos.forEach(p => {
-      if (p.es_fuera_de_zona) {
-        const outPos = { lat: Number(p.latitud), lng: Number(p.longitud) };
-        const timeStr = new Date(p.fecha_hora).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-        const outMarker = new window.google.maps.Marker({
-          position: outPos,
+        console.log("Drawing HQ marker at:", sedePos);
+        const hqMarker = new window.google.maps.Marker({
+          position: sedePos,
           map: map,
-          title: `Fuera de zona: ${timeStr}`,
+          title: `Sede: ${sede.nombre || 'Asignada'}`,
           icon: {
-            path: window.google.maps.SymbolPath.CIRCLE,
-            scale: 5.5,
-            fillColor: "#EF4444", // Red/orange
-            fillOpacity: 0.95,
+            path: window.google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
+            scale: 6,
+            fillColor: "#3B82F6",
+            fillOpacity: 1,
             strokeColor: "#FFFFFF",
-            strokeWeight: 1.5,
+            strokeWeight: 2,
           }
         });
+        markersRef.current.push(hqMarker);
 
-        const infoWindow = new window.google.maps.InfoWindow({
+        if (sede.radio_metros) {
+          console.log("Drawing HQ geofence circle with radius:", sede.radio_metros);
+          const circle = new window.google.maps.Circle({
+            strokeColor: "#3B82F6",
+            strokeOpacity: 0.8,
+            strokeWeight: 2,
+            fillColor: "#3B82F6",
+            fillOpacity: 0.15,
+            map: map,
+            center: sedePos,
+            radius: Number(sede.radio_metros)
+          });
+          circleRef.current = circle;
+        }
+      }
+
+      // 2. Journey Polyline
+      const pathCoordinates = puntos.map(p => {
+        const pos = { lat: Number(p.latitud), lng: Number(p.longitud) };
+        bounds.extend(pos);
+        return pos;
+      });
+
+      console.log("Drawing polyline with points:", pathCoordinates.length);
+      const polyline = new window.google.maps.Polyline({
+        path: pathCoordinates,
+        geodesic: true,
+        strokeColor: "#10B981", // Emerald green
+        strokeOpacity: 0.9,
+        strokeWeight: 4,
+        map: map
+      });
+      polylineRef.current = polyline;
+
+      // 3. Start Marker (Green circle with 'I')
+      if (puntos.length > 0) {
+        const firstPos = { lat: Number(puntos[0].latitud), lng: Number(puntos[0].longitud) };
+        const startMarker = new window.google.maps.Marker({
+          position: firstPos,
+          map: map,
+          title: "Punto Inicial",
+          label: {
+            text: "I",
+            color: "white",
+            fontWeight: "bold"
+          },
+          icon: {
+            path: window.google.maps.SymbolPath.CIRCLE,
+            scale: 9,
+            fillColor: "#059669",
+            fillOpacity: 1,
+            strokeColor: "#FFFFFF",
+            strokeWeight: 2,
+          }
+        });
+        markersRef.current.push(startMarker);
+      }
+
+      // 4. End Marker (Red circle with 'F')
+      if (puntos.length > 1) {
+        const lastPos = { lat: Number(puntos[puntos.length - 1].latitud), lng: Number(puntos[puntos.length - 1].longitud) };
+        const endMarker = new window.google.maps.Marker({
+          position: lastPos,
+          map: map,
+          title: "Punto Final",
+          label: {
+            text: "F",
+            color: "white",
+            fontWeight: "bold"
+          },
+          icon: {
+            path: window.google.maps.SymbolPath.CIRCLE,
+            scale: 9,
+            fillColor: "#DC2626",
+            fillOpacity: 1,
+            strokeColor: "#FFFFFF",
+            strokeWeight: 2,
+          }
+        });
+        markersRef.current.push(endMarker);
+      }
+
+      // 5. User Current Location Marker (Distinctive Blue Pulse Marker with InfoWindow)
+      if (puntos.length > 0) {
+        const lastP = puntos[puntos.length - 1];
+        const lastPos = { lat: Number(lastP.latitud), lng: Number(lastP.longitud) };
+        
+        const userWindow = new window.google.maps.InfoWindow({
           content: `
             <div style="font-family: Inter, sans-serif; padding: 6px; font-size: 13px; color: #1F2937;">
-              <strong style="color: #EF4444; display: block; margin-bottom: 4px;">Alerta: Fuera de Zona</strong>
-              <strong>Hora:</strong> ${timeStr}<br/>
-              <strong>Distancia:</strong> ${Math.round(p.distancia_sede_metros)} m de la sede<br/>
-              <strong>Batería:</strong> ${p.bateria_porcentaje !== null ? p.bateria_porcentaje + '%' : 'N/A'}<br/>
-              <strong>Precisión:</strong> ${p.precision_metros !== null ? Math.round(p.precision_metros) + ' m' : 'N/A'}
+              <strong style="color: #3B82F6; display: block; margin-bottom: 4px;">Ubicación del Usuario</strong>
+              <strong>Nombre:</strong> ${trackingRecorrido.usuario?.nombre_completo || 'Colaborador'}<br/>
+              <strong>Último reporte:</strong> ${new Date(lastP.fecha_hora).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}<br/>
+              <strong>Batería:</strong> ${lastP.bateria_porcentaje !== null ? lastP.bateria_porcentaje + '%' : 'N/A'}<br/>
+              <strong>Precisión:</strong> ${lastP.precision_metros !== null ? Math.round(lastP.precision_metros) + ' m' : 'N/A'}<br/>
+              <strong>Estado:</strong> <span style="color: ${lastP.es_fuera_de_zona ? '#EF4444' : '#10B981'}; font-weight: bold;">${lastP.es_fuera_de_zona ? 'Fuera de Zona' : 'Dentro de Zona'}</span>
             </div>
           `
         });
 
-        outMarker.addListener('click', () => {
-          infoWindow.open(map, outMarker);
+        const userMarker = new window.google.maps.Marker({
+          position: lastPos,
+          map: map,
+          title: "Última Ubicación Registrada",
+          zIndex: 999, // Ensure user marker is on top
+          icon: {
+            path: window.google.maps.SymbolPath.CIRCLE,
+            scale: 10,
+            fillColor: "#3B82F6", // Blue dot
+            fillOpacity: 1,
+            strokeColor: "#FFFFFF",
+            strokeWeight: 3,
+          }
         });
+        
+        userMarker.addListener('click', () => {
+          userWindow.open(map, userMarker);
+        });
+        markersRef.current.push(userMarker);
       }
-    });
 
-    // Auto fit map bounds
-    map.fitBounds(bounds);
+      // 6. Outside of Zone Alerts
+      puntos.forEach(p => {
+        if (p.es_fuera_de_zona) {
+          const outPos = { lat: Number(p.latitud), lng: Number(p.longitud) };
+          const timeStr = new Date(p.fecha_hora).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-    // Guard listener to prevent overzooming on single points
-    const listener = window.google.maps.event.addListener(map, "idle", () => {
-      if (map.getZoom() > 17) map.setZoom(16);
-      window.google.maps.event.removeListener(listener);
-    });
+          const outMarker = new window.google.maps.Marker({
+            position: outPos,
+            map: map,
+            title: `Alerta: Fuera de zona a las ${timeStr}`,
+            icon: {
+              path: window.google.maps.SymbolPath.CIRCLE,
+              scale: 5.5,
+              fillColor: "#EF4444", // Red dot for alert
+              fillOpacity: 0.95,
+              strokeColor: "#FFFFFF",
+              strokeWeight: 1.5,
+            }
+          });
 
-  }, [googleMapsLoaded, trackingRecorrido, jornadaDetalle, loadingDetail, loadingTracking]);
+          const infoWindow = new window.google.maps.InfoWindow({
+            content: `
+              <div style="font-family: Inter, sans-serif; padding: 6px; font-size: 13px; color: #1F2937;">
+                <strong style="color: #EF4444; display: block; margin-bottom: 4px;">Alerta: Fuera de Zona</strong>
+                <strong>Hora:</strong> ${timeStr}<br/>
+                <strong>Distancia:</strong> ${Math.round(p.distancia_sede_metros)} m de la sede<br/>
+                <strong>Batería:</strong> ${p.bateria_porcentaje !== null ? p.bateria_porcentaje + '%' : 'N/A'}<br/>
+                <strong>Precisión:</strong> ${p.precision_metros !== null ? Math.round(p.precision_metros) + ' m' : 'N/A'}
+              </div>
+            `
+          });
+
+          outMarker.addListener('click', () => {
+            infoWindow.open(map, outMarker);
+          });
+          markersRef.current.push(outMarker);
+        }
+      });
+
+      // Auto fit map bounds to show path + sede
+      console.log("Fitting map bounds");
+      map.fitBounds(bounds);
+
+      // Guard listener to prevent overzooming on single points or tight bounds
+      const listener = window.google.maps.event.addListener(map, "idle", () => {
+        if (map.getZoom() > 17) map.setZoom(16);
+        window.google.maps.event.removeListener(listener);
+      });
+    } catch (err) {
+      console.error("Error in map useEffect:", err);
+      setMapError("Error al renderizar el mapa: " + err.message);
+    }
+
+  }, [googleMapsLoaded, trackingRecorrido, selectedJornadaId, loadingTracking]);
 
   const handleUserSelect = (user) => {
     setSelectedUser(user);
@@ -388,6 +485,15 @@ const HistorialJornadas = () => {
 
   const handleJornadaSelect = (jornadaId) => {
     setSelectedJornadaId(jornadaId);
+    setLastUpdateTime(new Date());
+    
+    // Reset map refs to force complete recreation of map when switching journeys
+    mapInstanceRef.current = null;
+    mapJornadaIdRef.current = null;
+    polylineRef.current = null;
+    markersRef.current = [];
+    circleRef.current = null;
+    
     fetchJornadaDetalle(jornadaId);
     fetchTrackingRecorrido(jornadaId);
   };
@@ -399,6 +505,12 @@ const HistorialJornadas = () => {
     setJornadaDetalle(null);
     setTrackingRecorrido(null);
     setMapError(null);
+    
+    mapInstanceRef.current = null;
+    mapJornadaIdRef.current = null;
+    polylineRef.current = null;
+    markersRef.current = [];
+    circleRef.current = null;
   };
 
   const handleBackToHistory = () => {
@@ -406,6 +518,12 @@ const HistorialJornadas = () => {
     setJornadaDetalle(null);
     setTrackingRecorrido(null);
     setMapError(null);
+    
+    mapInstanceRef.current = null;
+    mapJornadaIdRef.current = null;
+    polylineRef.current = null;
+    markersRef.current = [];
+    circleRef.current = null;
   };
 
   const handleFilterChange = (e) => {
@@ -943,11 +1061,19 @@ const HistorialJornadas = () => {
               <div className="card recorrido-gps-card mt-4 animate-in">
                 <div className="card-header-flex">
                   <h2>Recorrido GPS</h2>
-                  {trackingRecorrido && (
-                    <span className="badge-count">
-                      {trackingRecorrido.resumen.total_puntos} puntos
-                    </span>
-                  )}
+                  <div className="flex gap-2 items-center">
+                    {trackingRecorrido && (
+                      <span className="badge-count">
+                        {trackingRecorrido.resumen.total_puntos} puntos
+                      </span>
+                    )}
+                    {trackingRecorrido && (trackingRecorrido.jornada?.estado_jornada === 'en_proceso' || !trackingRecorrido.jornada?.hora_salida) && (
+                      <span className="pulse-badge-live">
+                        <span className="pulse-dot"></span>
+                        En Vivo (60s)
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 {loadingTracking ? (
@@ -963,13 +1089,13 @@ const HistorialJornadas = () => {
                 ) : !trackingRecorrido || trackingRecorrido.puntos.length === 0 ? (
                   <div className="empty-state text-center p-8">
                     <MapPin size={40} className="text-muted mb-2" />
-                    <p className="text-gray-600">No se registraron puntos GPS para esta jornada.</p>
+                    <p className="text-gray-600">Aún no se registran puntos GPS para esta jornada.</p>
                   </div>
                 ) : (
                   <div className="gps-section-layout">
                     {/* Map Container */}
                     <div className="google-map-wrapper">
-                      <div id="google-map-container" className="google-map-canvas">
+                      <div ref={mapContainerRef} id="google-map-container" className="google-map-canvas">
                         {!googleMapsLoaded && (
                           <div className="loading-state" style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1rem' }}>
                             <div className="spinner"></div>
@@ -983,6 +1109,33 @@ const HistorialJornadas = () => {
                     <div className="gps-metrics-sidebar">
                       <h3>Resumen del Recorrido</h3>
                       
+                      {trackingRecorrido.resumen.ultima_ubicacion && (
+                        <div className="gps-metric-tile">
+                          <span className="tile-label">Estado de zona</span>
+                          <span className={`tile-value font-bold ${trackingRecorrido.resumen.ultima_ubicacion.es_fuera_de_zona ? 'text-danger' : 'text-success'}`}>
+                            {trackingRecorrido.resumen.ultima_ubicacion.es_fuera_de_zona ? 'FUERA DE ZONA' : 'DENTRO DE ZONA'}
+                          </span>
+                        </div>
+                      )}
+
+                      {trackingRecorrido.resumen.ultima_ubicacion && (
+                        <div className="gps-metric-tile">
+                          <span className="tile-label">Distancia a la sede</span>
+                          <span className="tile-value font-semibold">
+                            {trackingRecorrido.resumen.ultima_ubicacion.distancia_sede_metros !== null
+                              ? `${Math.round(trackingRecorrido.resumen.ultima_ubicacion.distancia_sede_metros)} metros`
+                              : 'No disponible'}
+                          </span>
+                        </div>
+                      )}
+
+                      <div className="gps-metric-tile">
+                        <span className="tile-label">Última actualización de datos</span>
+                        <span className="tile-value font-semibold text-info">
+                          {lastUpdateTime ? lastUpdateTime.toLocaleTimeString() : '--:--'}
+                        </span>
+                      </div>
+
                       <div className="gps-metric-tile">
                         <span className="tile-label">Total de puntos registrados</span>
                         <span className="tile-value">{trackingRecorrido.resumen.total_puntos}</span>
@@ -995,8 +1148,20 @@ const HistorialJornadas = () => {
                         </span>
                       </div>
 
+                      {trackingRecorrido.sede && (
+                        <div className="gps-metric-tile gps-tile-full">
+                          <span className="tile-label">Ubicación Sede/Local</span>
+                          <span className="tile-value subtext">
+                            <strong>{trackingRecorrido.sede.nombre || 'Asignada'}</strong>
+                            <span className="coordinates">
+                              (Radio: {trackingRecorrido.sede.radio_metros || 0} metros)
+                            </span>
+                          </span>
+                        </div>
+                      )}
+
                       {trackingRecorrido.resumen.primera_ubicacion && (
-                        <div className="gps-metric-tile">
+                        <div className="gps-metric-tile gps-tile-full">
                           <span className="tile-label">Primera ubicación</span>
                           <span className="tile-value subtext">
                             <strong>{formatTime(trackingRecorrido.resumen.primera_ubicacion.fecha_hora)}</strong>
@@ -1008,7 +1173,7 @@ const HistorialJornadas = () => {
                       )}
 
                       {trackingRecorrido.resumen.ultima_ubicacion && (
-                        <div className="gps-metric-tile">
+                        <div className="gps-metric-tile gps-tile-full">
                           <span className="tile-label">Última ubicación</span>
                           <span className="tile-value subtext">
                             <strong>{formatTime(trackingRecorrido.resumen.ultima_ubicacion.fecha_hora)}</strong>
@@ -1020,7 +1185,7 @@ const HistorialJornadas = () => {
                       )}
 
                       {trackingRecorrido.resumen.ultima_ubicacion && (
-                        <div className="gps-two-column">
+                        <div className="gps-two-column gps-tile-full">
                           {trackingRecorrido.resumen.ultima_ubicacion.bateria_porcentaje !== null && (
                             <div className="gps-metric-tile">
                               <span className="tile-label">Batería última</span>

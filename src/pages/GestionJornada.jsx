@@ -8,7 +8,15 @@ import MainLayout from '../layouts/MainLayout';
 import { useNotification } from '../context/NotificationContext';
 import './GestionJornada.css';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
+const API_URL = import.meta.env.VITE_API_URL || 'https://apifincontrol.finatech.com.pe/api';
+
+const getLocalDateString = () => {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
 
 const GestionJornada = () => {
   const navigate = useNavigate();
@@ -61,14 +69,14 @@ const GestionJornada = () => {
       { dia_semana: 'domingo', activo: false, hora_inicio_entrada: '08:00:00', hora_fin_entrada: '09:00:00', hora_inicio_salida: '13:00:00', hora_fin_salida: '15:00:00' }
     ],
     usuarios_asignados: [],
-    vigente_desde: new Date().toISOString().split('T')[0],
+    vigente_desde: getLocalDateString(),
     vigente_hasta: ''
   });
 
   const [assignForm, setAssignForm] = useState({
     usuarios: [], // supports multi-assign
     horario: '',
-    vigente_desde: new Date().toISOString().split('T')[0],
+    vigente_desde: getLocalDateString(),
     vigente_hasta: '',
     observacion: ''
   });
@@ -76,7 +84,7 @@ const GestionJornada = () => {
   const [swapForm, setSwapForm] = useState({
     usuario_solicitante: '',
     usuario_reemplazo: '',
-    fecha_intercambio: new Date().toISOString().split('T')[0],
+    fecha_intercambio: getLocalDateString(),
     motivo: '',
     observacion: ''
   });
@@ -234,7 +242,7 @@ const GestionJornada = () => {
         descripcion: horario.descripcion || '',
         detalles: mappedDetalles,
         usuarios_asignados: [],
-        vigente_desde: new Date().toISOString().split('T')[0],
+        vigente_desde: getLocalDateString(),
         vigente_hasta: ''
       });
     } else {
@@ -259,7 +267,7 @@ const GestionJornada = () => {
           { dia_semana: 'domingo', activo: false, hora_inicio_entrada: '08:00:00', hora_fin_entrada: '09:00:00', hora_inicio_salida: '13:00:00', hora_fin_salida: '15:00:00' }
         ],
         usuarios_asignados: [],
-        vigente_desde: new Date().toISOString().split('T')[0],
+        vigente_desde: getLocalDateString(),
         vigente_hasta: ''
       });
     }
@@ -426,7 +434,7 @@ const GestionJornada = () => {
     setAssignForm({
       usuarios: quickUser ? [quickUser.id] : [],
       horario: horarios.length > 0 ? horarios[0].id : '',
-      vigente_desde: new Date().toISOString().split('T')[0],
+      vigente_desde: getLocalDateString(),
       vigente_hasta: '',
       observacion: ''
     });
@@ -512,7 +520,7 @@ const GestionJornada = () => {
     setSwapForm({
       usuario_solicitante: '',
       usuario_reemplazo: '',
-      fecha_intercambio: new Date().toISOString().split('T')[0],
+      fecha_intercambio: getLocalDateString(),
       motivo: '',
       observacion: ''
     });
