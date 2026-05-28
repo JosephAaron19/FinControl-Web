@@ -221,13 +221,16 @@ const Sedes = () => {
     if (!isModalOpen || !mapsLoaded) return;
 
     // Timeout to ensure DOM element is mounted
-    const timer = setTimeout(() => {
+    const timer = setTimeout(async () => {
       if (!mapContainerRef.current) return;
 
       const defaultLat = parseFloat(formData.latitud) || -12.046374; // Lima default
       const defaultLng = parseFloat(formData.longitud) || -77.042793;
       const hasCoords = !isNaN(parseFloat(formData.latitud)) && !isNaN(parseFloat(formData.longitud));
       const initialCenter = { lat: defaultLat, lng: defaultLng };
+
+      // Load AdvancedMarkerElement library
+      const { AdvancedMarkerElement } = await window.google.maps.importLibrary("marker");
 
       // Create Map
       const map = new window.google.maps.Map(mapContainerRef.current, {
@@ -237,15 +240,15 @@ const Sedes = () => {
         mapTypeControl: false,
         streetViewControl: false,
         fullscreenControl: false,
+        mapId: "DEMO_MAP_ID" // Required for AdvancedMarkerElement
       });
       googleMapInstanceRef.current = map;
 
       // Create Marker
-      const marker = new window.google.maps.Marker({
+      const marker = new AdvancedMarkerElement({
         position: initialCenter,
-        map: map,
-        draggable: true,
-        visible: hasCoords,
+        map: hasCoords ? map : null,
+        gmpDraggable: true,
         title: formData.nombre || 'Sede'
       });
       markerRef.current = marker;
@@ -296,8 +299,8 @@ const Sedes = () => {
           const newPos = { lat, lng };
           map.setCenter(newPos);
           map.setZoom(16);
-          marker.setPosition(newPos);
-          marker.setVisible(true);
+          marker.position = newPos;
+          marker.map = map;
           circle.setCenter(newPos);
           circle.setVisible(true);
         });
@@ -317,8 +320,8 @@ const Sedes = () => {
         }));
 
         const newPos = { lat, lng };
-        marker.setPosition(newPos);
-        marker.setVisible(true);
+        marker.position = newPos;
+        marker.map = map;
         circle.setCenter(newPos);
         circle.setVisible(true);
 
@@ -338,9 +341,9 @@ const Sedes = () => {
 
       // Marker Drag End Handler (Refine Location)
       marker.addListener('dragend', () => {
-        const pos = marker.getPosition();
-        const lat = pos.lat();
-        const lng = pos.lng();
+        const pos = marker.position;
+        const lat = typeof pos.lat === 'function' ? pos.lat() : pos.lat;
+        const lng = typeof pos.lng === 'function' ? pos.lng() : pos.lng;
 
         setFormData(prev => ({
           ...prev,
@@ -397,8 +400,8 @@ const Sedes = () => {
       const pos = { lat, lng };
       
       if (markerRef.current) {
-        markerRef.current.setPosition(pos);
-        markerRef.current.setVisible(true);
+        markerRef.current.position = pos;
+        markerRef.current.map = googleMapInstanceRef.current;
       }
       
       if (circleRef.current) {
@@ -407,7 +410,7 @@ const Sedes = () => {
         circleRef.current.setVisible(true);
       }
     } else {
-      if (markerRef.current) markerRef.current.setVisible(false);
+      if (markerRef.current) markerRef.current.map = null;
       if (circleRef.current) circleRef.current.setVisible(false);
     }
   }, [formData.latitud, formData.longitud, formData.radio_metros]);
