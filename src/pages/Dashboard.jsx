@@ -47,8 +47,8 @@ const EmptyState = ({ icon: Icon, title, description, exampleInfo }) => {
 // CUSTOM SVG / HTML CHART COMPONENTS
 // ==========================================
 
-const DonutChart = ({ data, emptyIcon, emptyTitle, emptyDescription, emptyExample }) => {
-  const total = data.reduce((sum, item) => sum + item.cantidad, 0);
+const DonutChart = ({ data = [], emptyIcon, emptyTitle, emptyDescription, emptyExample }) => {
+  const total = data ? data.reduce((sum, item) => sum + (item.cantidad || 0), 0) : 0;
   
   if (total === 0) {
     return (
@@ -117,8 +117,8 @@ const DonutChart = ({ data, emptyIcon, emptyTitle, emptyDescription, emptyExampl
   );
 };
 
-const BarChart = ({ data, emptyIcon, emptyTitle, emptyDescription, emptyExample }) => {
-  const maxVal = Math.max(...data.map(d => d.completa + d.incompleta + d.ausente), 1);
+const BarChart = ({ data = [], emptyIcon, emptyTitle, emptyDescription, emptyExample }) => {
+  const maxVal = Math.max(...data.map(d => (d.completa || 0) + (d.incompleta || 0) + (d.ausente || 0)), 1);
   const hasData = data.some(d => d.completa > 0 || d.incompleta > 0 || d.ausente > 0);
 
   if (!hasData) {
@@ -145,7 +145,7 @@ const BarChart = ({ data, emptyIcon, emptyTitle, emptyDescription, emptyExample 
     <div className="bar-chart-container">
       <div className="bar-chart-bars">
         {data.map((d, i) => {
-          const total = d.completa + d.incompleta + d.ausente;
+          const total = (d.completa || 0) + (d.incompleta || 0) + (d.ausente || 0);
           const hCompleta = total > 0 ? (d.completa / maxVal) * 100 : 0;
           const hIncompleta = total > 0 ? (d.incompleta / maxVal) * 100 : 0;
           const hAusente = total > 0 ? (d.ausente / maxVal) * 100 : 0;
@@ -192,7 +192,7 @@ const BarChart = ({ data, emptyIcon, emptyTitle, emptyDescription, emptyExample 
   );
 };
 
-const HorizontalBarChart = ({ data, labelKey = 'sede', valueKey = 'cantidad', emptyIcon, emptyTitle, emptyDescription, emptyExample }) => {
+const HorizontalBarChart = ({ data = [], labelKey = 'sede', valueKey = 'cantidad', emptyIcon, emptyTitle, emptyDescription, emptyExample }) => {
   const maxVal = Math.max(...data.map(d => d[valueKey] || 0), 1);
   const total = data.reduce((sum, item) => sum + (item[valueKey] || 0), 0);
 
@@ -241,6 +241,9 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const [rango, setRango] = useState('hoy');
   const [selectedSede, setSelectedSede] = useState('');
+  const [selectedRol, setSelectedRol] = useState('');
+  const [fechaInicio, setFechaInicio] = useState('');
+  const [fechaFin, setFechaFin] = useState('');
   const [sedesList, setSedesList] = useState([]);
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -262,7 +265,7 @@ const Dashboard = () => {
     }
   }, []);
 
-  const fetchDashboardData = useCallback(async (currentRango, currentSede) => {
+  const fetchDashboardData = useCallback(async (currentRango, currentSede, currentRol, start, end) => {
     const token = localStorage.getItem('access_token');
     if (!token) {
       navigate('/login');
@@ -272,7 +275,10 @@ const Dashboard = () => {
     setLoading(true);
     try {
       const headers = { Authorization: `Bearer ${token}` };
-      const url = `${API_URL}/dashboard/resumen/?rango=${currentRango}&sede=${currentSede || ''}`;
+      let url = `${API_URL}/dashboard/resumen/?rango=${currentRango}&sede=${currentSede || ''}&rol=${currentRol || ''}`;
+      if (currentRango === 'personalizado' && start && end) {
+        url += `&fecha_inicio=${start}&fecha_fin=${end}`;
+      }
       
       const res = await fetch(url, { headers });
       if (res.ok) {
@@ -291,7 +297,7 @@ const Dashboard = () => {
 
   useWebSockets((data) => {
     if (data.type === 'attendance_update' || data.type === 'incident_update') {
-      fetchDashboardData(rango, selectedSede);
+      fetchDashboardData(rango, selectedSede, selectedRol, fechaInicio, fechaFin);
     }
   });
 
@@ -300,8 +306,19 @@ const Dashboard = () => {
   }, [fetchSedes]);
 
   useEffect(() => {
-    fetchDashboardData(rango, selectedSede);
-  }, [rango, selectedSede, fetchDashboardData]);
+    if (rango !== 'personalizado' || (fechaInicio && fechaFin)) {
+      fetchDashboardData(rango, selectedSede, selectedRol, fechaInicio, fechaFin);
+    }
+  }, [rango, selectedSede, selectedRol, fechaInicio, fechaFin, fetchDashboardData]);
+
+  const handleRangeChange = (newRango) => {
+    setRango(newRango);
+    if (newRango === 'personalizado' && (!fechaInicio || !fechaFin)) {
+      const todayStr = new Date().toISOString().split('T')[0];
+      setFechaInicio(todayStr);
+      setFechaFin(todayStr);
+    }
+  };
 
   // Formatted date string for header
   const getFormattedDate = () => {
@@ -348,7 +365,13 @@ const Dashboard = () => {
     : 0;
 
   // Map backend graph data with colors
-  const rangeLabel = rango === 'hoy' ? 'hoy' : rango === 'semana' ? 'esta semana' : 'este mes';
+  const rangeLabel = rango === 'hoy' 
+    ? 'hoy' 
+    : rango === 'semana' 
+      ? 'esta semana' 
+      : rango === 'mes' 
+        ? 'este mes' 
+        : 'en el periodo';
 
   const puntualidadChartData = [
     { estado: 'Puntual', cantidad: data.puntualidad.puntual, color: 'var(--color-success)' },
@@ -397,7 +420,8 @@ const Dashboard = () => {
             <span className="filter-label">{getFormattedDate()}</span>
           </div>
 
-          <div className="filter-group">
+          <div className="filter-group flex-wrap gap-3">
+            {/* Sede Selector */}
             <div className="flex items-center gap-2">
               <label className="filter-label">Sede:</label>
               <select 
@@ -412,24 +436,64 @@ const Dashboard = () => {
               </select>
             </div>
 
+            {/* Rol Selector */}
+            <div className="flex items-center gap-2">
+              <label className="filter-label">Rol:</label>
+              <select 
+                className="select-input" 
+                value={selectedRol} 
+                onChange={(e) => setSelectedRol(e.target.value)}
+              >
+                <option value="">Todos los Roles</option>
+                <option value="operador">Operadores</option>
+                <option value="asesor">Asesores</option>
+              </select>
+            </div>
+
+            {/* Custom Date Inputs (shown when personalizado) */}
+            {rango === 'personalizado' && (
+              <div className="flex items-center gap-2 date-inputs-container">
+                <input 
+                  type="date" 
+                  className="select-input date-input" 
+                  value={fechaInicio} 
+                  onChange={(e) => setFechaInicio(e.target.value)}
+                />
+                <span className="filter-label">a</span>
+                <input 
+                  type="date" 
+                  className="select-input date-input" 
+                  value={fechaFin} 
+                  onChange={(e) => setFechaFin(e.target.value)}
+                />
+              </div>
+            )}
+
+            {/* Preset Buttons */}
             <div className="date-badge-group">
               <button 
                 className={`date-btn ${rango === 'hoy' ? 'active' : ''}`}
-                onClick={() => setRango('hoy')}
+                onClick={() => handleRangeChange('hoy')}
               >
                 Hoy
               </button>
               <button 
                 className={`date-btn ${rango === 'semana' ? 'active' : ''}`}
-                onClick={() => setRango('semana')}
+                onClick={() => handleRangeChange('semana')}
               >
                 Semana
               </button>
               <button 
                 className={`date-btn ${rango === 'mes' ? 'active' : ''}`}
-                onClick={() => setRango('mes')}
+                onClick={() => handleRangeChange('mes')}
               >
                 Mes
+              </button>
+              <button 
+                className={`date-btn ${rango === 'personalizado' ? 'active' : ''}`}
+                onClick={() => handleRangeChange('personalizado')}
+              >
+                Personalizado
               </button>
             </div>
           </div>
@@ -536,8 +600,8 @@ const Dashboard = () => {
             <BarChart 
               data={data.graficos.asistencia_por_dia_semana || []} 
               emptyIcon={Calendar}
-              emptyTitle="Aún no hay registros de asistencia"
-              emptyDescription="Aquí se mostrará la evolución de jornadas completas, incompletas y ausentes por día."
+              emptyTitle="Aún no hay registros de asistencia."
+              emptyDescription="Cuando los usuarios marquen entrada y salida, aquí se mostrará la tendencia."
               emptyExample="Evolución de jornadas marcadas con check-in y check-out correctos por día de la semana."
             />
           </div>
@@ -550,7 +614,7 @@ const Dashboard = () => {
             <DonutChart 
               data={puntualidadChartData} 
               emptyIcon={Clock}
-              emptyTitle="Aún no hay marcaciones de entrada"
+              emptyTitle="Aún no hay marcaciones de entrada."
               emptyDescription="Aquí se visualizarán los usuarios puntuales, tardanzas y entradas no marcadas."
               emptyExample="Porcentaje de ingresos puntuales frente a ingresos fuera del horario de tolerancia establecido."
             />
@@ -568,7 +632,7 @@ const Dashboard = () => {
               labelKey="sede" 
               valueKey="cantidad" 
               emptyIcon={MapPin}
-              emptyTitle="Aún no hay personal asignado"
+              emptyTitle="Aún no hay personal asignado."
               emptyDescription="Aquí se mostrará la cantidad de operadores y asesores por sede."
               emptyExample="Visualización del total de asesores asignados a Sede Norte, Sede Sur o Sede Central."
             />
@@ -582,7 +646,7 @@ const Dashboard = () => {
             <DonutChart 
               data={incidenciasChartData} 
               emptyIcon={AlertTriangle}
-              emptyTitle="Aún no hay incidencias reportadas"
+              emptyTitle="No hay incidencias registradas en el periodo seleccionado."
               emptyDescription="Aquí se agruparán las incidencias reportadas por categoría."
               emptyExample="Distribución de incidentes de soporte: fallas del celular, retrasos justificados, emergencias."
             />
@@ -596,7 +660,7 @@ const Dashboard = () => {
             <DonutChart 
               data={actividadesChartData} 
               emptyIcon={FileText}
-              emptyTitle="Aún no hay actividades registradas"
+              emptyTitle="No hay actividades de campo registradas."
               emptyDescription="Aquí se verán las actividades iniciadas y finalizadas por los asesores."
               emptyExample="Resumen de actividades diarias iniciadas en ruta frente a reportes cerrados."
             />

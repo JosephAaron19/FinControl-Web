@@ -48,17 +48,17 @@ const Sidebar = ({ isOpen, onClose }) => {
             </>
           )}
 
-          <NavLink to="/actividad" onClick={onClose} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-            <Activity size={20} />
-            <span>{isOperativo ? 'Mi Actividad' : 'Monitoreo'}</span>
-          </NavLink>
-
           {isAdmin && (
             <NavLink to="/jornada" onClick={onClose} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
               <Calendar size={20} />
               <span>Gestión Jornada</span>
             </NavLink>
           )}
+
+          <NavLink to="/actividad" onClick={onClose} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+            <Activity size={20} />
+            <span>{isOperativo ? 'Mi Actividad' : 'Monitoreo'}</span>
+          </NavLink>
 
           <NavLink to="/historial-jornadas" onClick={onClose} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
             <Settings size={20} />

@@ -53,6 +53,15 @@ const HistorialJornadas = () => {
   const [jornadaDetalle, setJornadaDetalle] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
 
+  // Role & Sede Organization States
+  const userRole = (localStorage.getItem('user_role') || '').toUpperCase();
+  const isOperativo = userRole === 'OPERADOR' || userRole === 'ASESOR';
+  const [sedesResumen, setSedesResumen] = useState([]);
+  const [selectedSede, setSelectedSede] = useState(null);
+  const [loadingSedes, setLoadingSedes] = useState(true);
+  const [roleFilter, setRoleFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+
   // GPS tracking states
   const [trackingRecorrido, setTrackingRecorrido] = useState(null);
   const [loadingTracking, setLoadingTracking] = useState(false);
@@ -144,11 +153,36 @@ const HistorialJornadas = () => {
     }
   }, []);
 
-  const fetchUsuarios = useCallback(async () => {
+  const fetchSedesResumen = useCallback(async () => {
+    setLoadingSedes(true);
+    const token = localStorage.getItem('access_token');
+    try {
+      const queryParams = new URLSearchParams();
+      if (filters.fecha_inicio) queryParams.append('fecha_inicio', filters.fecha_inicio);
+      if (filters.fecha_fin) queryParams.append('fecha_fin', filters.fecha_fin);
+
+      const res = await fetch(`${API_URL}/sedes/historial-resumen/?${queryParams.toString()}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSedesResumen(data);
+      }
+    } catch (err) {
+      console.error('Error fetching sedes resumen:', err);
+    } finally {
+      setLoadingSedes(false);
+    }
+  }, [filters.fecha_inicio, filters.fecha_fin]);
+
+  const fetchUsuarios = useCallback(async (sedeId = null) => {
     setLoadingUsers(true);
     const token = localStorage.getItem('access_token');
     try {
-      const res = await fetch(`${API_URL}/usuarios/?solo_operadores=true`, {
+      const url = sedeId
+        ? `${API_URL}/usuarios/?sede=${sedeId}&solo_operadores=true`
+        : `${API_URL}/usuarios/?solo_operadores=true`;
+      const res = await fetch(url, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {
@@ -161,6 +195,14 @@ const HistorialJornadas = () => {
       setLoadingUsers(false);
     }
   }, []);
+
+  const handleSedeSelect = (sede) => {
+    setSelectedSede(sede);
+    setRoleFilter('');
+    setStatusFilter('');
+    setSearchTerm('');
+    fetchUsuarios(sede.sede_id);
+  };
 
   // WebSocket handling
   const onSocketMessage = useCallback((data) => {
@@ -178,8 +220,20 @@ const HistorialJornadas = () => {
   useWebSockets(onSocketMessage);
 
   useEffect(() => {
-    fetchUsuarios();
-  }, [fetchUsuarios]);
+    if (isOperativo) {
+      fetchUsuarios();
+    } else {
+      fetchSedesResumen();
+    }
+  }, [isOperativo, fetchUsuarios, fetchSedesResumen]);
+
+  // Bypass selection for operators
+  useEffect(() => {
+    if (isOperativo && usuarios.length === 1) {
+      setSelectedUser(usuarios[0]);
+      fetchHistorial(usuarios[0].id);
+    }
+  }, [usuarios, isOperativo, fetchHistorial]);
 
   // Dynamically load Google Maps script
   useEffect(() => {
@@ -604,10 +658,12 @@ const HistorialJornadas = () => {
     return new Date(isoString).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
-  const filteredUsers = usuarios.filter(u => 
-    u.nombre_completo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    u.dni.includes(searchTerm)
-  );
+  const filteredUsers = usuarios.filter(u => {
+    const matchesSearch = u.nombre_completo.toLowerCase().includes(searchTerm.toLowerCase()) || u.dni.includes(searchTerm);
+    const matchesRole = !roleFilter || (u.rol_info?.codigo || '').toLowerCase() === roleFilter.toLowerCase();
+    const matchesStatus = !statusFilter || (statusFilter === 'active' ? u.activo === true : u.activo === false);
+    return matchesSearch && matchesRole && matchesStatus;
+  });
 
   return (
     <MainLayout 
@@ -619,19 +675,157 @@ const HistorialJornadas = () => {
       }
     >
       <div className="historial-container">
-        {!selectedUser ? (
+        {!isOperativo && !selectedSede ? (
+          /* LEVEL 0: SEDE SELECTION */
+          <div className="sedes-selection-view animate-in">
+            {/* Date Filters Card */}
+            <div className="card filters-card">
+              <form onSubmit={(e) => { e.preventDefault(); fetchSedesResumen(); }} className="filters-grid">
+                <div className="filter-group">
+                  <label><Calendar size={16} /> Desde</label>
+                  <input type="date" name="fecha_inicio" value={filters.fecha_inicio} onChange={handleFilterChange} className="input-field" />
+                </div>
+                <div className="filter-group">
+                  <label><Calendar size={16} /> Hasta</label>
+                  <input type="date" name="fecha_fin" value={filters.fecha_fin} onChange={handleFilterChange} className="input-field" />
+                </div>
+                <div className="filter-actions">
+                  <button type="submit" className="btn-primary"><Search size={18} /> Filtrar Sedes</button>
+                </div>
+              </form>
+            </div>
+
+            {loadingSedes ? (
+              <div className="loading-state">
+                <div className="spinner"></div>
+                <p>Cargando resumen de sedes...</p>
+              </div>
+            ) : sedesResumen.length === 0 ? (
+              <div className="empty-state">
+                <MapPin size={48} className="empty-icon" />
+                <p>No se encontraron sedes autorizadas.</p>
+              </div>
+            ) : (
+              <div className="sedes-grid">
+                {sedesResumen.map(sede => (
+                  <div key={sede.sede_id} className="sede-card card">
+                    <div className="sede-card-header">
+                      <div className="sede-icon-wrapper">
+                        <MapPin size={24} />
+                      </div>
+                      <h3>{sede.sede_nombre}</h3>
+                    </div>
+                    
+                    <div className="sede-card-body">
+                      <div className="sede-metrics-section">
+                        <h4>Personal</h4>
+                        <div className="sede-metric-row">
+                          <span>Operadores:</span>
+                          <strong>{sede.cantidad_operadores}</strong>
+                        </div>
+                        <div className="sede-metric-row">
+                          <span>Asesores:</span>
+                          <strong>{sede.cantidad_asesores}</strong>
+                        </div>
+                      </div>
+
+                      <div className="sede-metrics-section">
+                        <h4>Jornadas</h4>
+                        <div className="sede-metric-row">
+                          <span>Registradas:</span>
+                          <strong>{sede.jornadas_registradas}</strong>
+                        </div>
+                        <div className="sede-metric-row">
+                          <span>En proceso:</span>
+                          <span className="text-warning font-semibold">{sede.jornadas_en_proceso}</span>
+                        </div>
+                        <div className="sede-metric-row">
+                          <span>Completas:</span>
+                          <span className="text-success font-semibold">{sede.jornadas_completas}</span>
+                        </div>
+                        <div className="sede-metric-row">
+                          <span>Ausencias:</span>
+                          <span className="text-danger font-semibold">{sede.ausencias}</span>
+                        </div>
+                      </div>
+
+                      <div className="sede-metrics-section">
+                        <h4>Incidencias</h4>
+                        <div className="sede-metric-row">
+                          <span>Reportadas:</span>
+                          <span className={sede.incidencias > 0 ? "text-danger font-bold" : "font-semibold"}>
+                            {sede.incidencias}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="sede-card-footer">
+                      <button 
+                        className="btn btn-primary w-full justify-center" 
+                        onClick={() => handleSedeSelect(sede)}
+                      >
+                        Ver usuarios
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : !selectedUser ? (
           /* LEVEL 1: USER SELECTION */
           <div className="user-selection-view animate-in">
-            <div className="selection-header card">
-              <div className="search-wrapper">
-                <Search size={20} className="search-icon" />
-                <input 
-                  type="text" 
-                  placeholder="Buscar usuario por nombre o DNI..." 
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="search-input"
-                />
+            {!isOperativo && (
+              <div className="view-actions">
+                <button className="btn-back" onClick={() => setSelectedSede(null)}>
+                  <ChevronRight size={20} style={{ transform: 'rotate(180deg)' }} /> Volver a Sedes
+                </button>
+              </div>
+            )}
+
+            <div className="card selection-header-with-filters">
+              <div className="sede-details-title mb-4">
+                <h2>Usuarios de Sede: {selectedSede?.sede_nombre}</h2>
+              </div>
+              <div className="user-filters-grid">
+                {/* Search input */}
+                <div className="search-wrapper">
+                  <Search size={20} className="search-icon" />
+                  <input 
+                    type="text" 
+                    placeholder="Buscar usuario por nombre o DNI..." 
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="search-input"
+                  />
+                </div>
+
+                {/* Role select */}
+                <div className="filter-select-group">
+                  <select 
+                    value={roleFilter} 
+                    onChange={(e) => setRoleFilter(e.target.value)}
+                    className="input-field"
+                  >
+                    <option value="">Todos los Roles</option>
+                    <option value="operador">Operadores</option>
+                    <option value="asesor">Asesores</option>
+                  </select>
+                </div>
+
+                {/* Status select */}
+                <div className="filter-select-group">
+                  <select 
+                    value={statusFilter} 
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="input-field"
+                  >
+                    <option value="">Todos los Estados</option>
+                    <option value="active">Activos</option>
+                    <option value="inactive">Inactivos</option>
+                  </select>
+                </div>
               </div>
             </div>
 
@@ -639,6 +833,11 @@ const HistorialJornadas = () => {
               <div className="loading-state">
                 <div className="spinner"></div>
                 <p>Cargando usuarios...</p>
+              </div>
+            ) : filteredUsers.length === 0 ? (
+              <div className="empty-state">
+                <AlertCircle size={48} />
+                <p>Esta sede aún no tiene usuarios que coincidan con la búsqueda.</p>
               </div>
             ) : (
               <div className="users-grid">
@@ -654,9 +853,14 @@ const HistorialJornadas = () => {
                     <div className="user-card-info">
                       <h3>{user.nombre_completo}</h3>
                       <p><User size={14} /> {user.dni}</p>
-                      <span className="user-card-sede">
-                        <MapPin size={12} /> {user.sede_info?.nombre || 'Sin Sede'}
-                      </span>
+                      <div className="flex gap-2 items-center flex-wrap mt-1">
+                        <span className={`role-badge mini ${(user.rol_info?.codigo || '').toLowerCase()}`}>
+                          {user.rol_info?.name || user.rol_info?.nombre || 'Sin Rol'}
+                        </span>
+                        <span className={`status-badge small ${user.activo ? 'valid' : 'invalid'}`} style={{ padding: '0.1rem 0.4rem', fontSize: '0.65rem' }}>
+                          {user.activo ? 'Activo' : 'Inactivo'}
+                        </span>
+                      </div>
                     </div>
                     <ChevronRight size={20} className="arrow-icon" />
                   </div>

@@ -72,6 +72,17 @@
   font-weight: 600;
 }
 
+.date-inputs-container {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.date-input {
+  color-scheme: dark;
+  max-width: 140px;
+}
+
 /* KPI Grid */
 .stats-grid {
   display: grid;
