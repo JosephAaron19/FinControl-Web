@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  Plus, Edit2, Trash2, Calendar, X, MapPin, Users, 
+import {
+  Plus, Edit2, Trash2, Calendar, X, MapPin, Users,
   UserCheck, UserX, RefreshCw, ChevronLeft, CalendarRange, Clock, AlertTriangle
 } from 'lucide-react';
 import MainLayout from '../layouts/MainLayout';
 import { useNotification } from '../context/NotificationContext';
 import './GestionJornada.css';
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://apifincontrol.finatech.com.pe/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
 
 const getLocalDateString = () => {
   const d = new Date();
@@ -21,7 +21,7 @@ const getLocalDateString = () => {
 const GestionJornada = () => {
   const navigate = useNavigate();
   const { showNotification } = useNotification();
-  
+
   // Level 1 vs Level 2 navigation
   const [selectedSede, setSelectedSede] = useState(null); // Sede object or null
   const [sedesResumen, setSedesResumen] = useState([]);
@@ -186,7 +186,7 @@ const GestionJornada = () => {
     setUserSearchTerm('');
     if (horario) {
       setCurrentHorario(horario);
-      
+
       // Load details for days of week
       const mappedDetalles = [
         { dia_semana: 'lunes', activo: false, hora_inicio_entrada: '08:00:00', hora_fin_entrada: '09:00:00', hora_inicio_salida: '17:00:00', hora_fin_salida: '19:00:00' },
@@ -318,7 +318,7 @@ const GestionJornada = () => {
   const handleSaveHorario = async (e) => {
     e.preventDefault();
     const token = localStorage.getItem('access_token');
-    
+
     // Check if at least one day is active
     const activeDays = horarioForm.detalles.filter(d => d.activo);
     if (activeDays.length === 0) {
@@ -590,7 +590,7 @@ const GestionJornada = () => {
   return (
     <MainLayout
       title="Gestión de Horarios y Jornadas"
-      subtitle={selectedSede 
+      subtitle={selectedSede
         ? `Sede: ${selectedSede.sede_nombre} - Planificación de turnos personalizados, descansos e intercambios temporales.`
         : "Planificación de turnos e intercambios con control estricto por sede."
       }
@@ -657,7 +657,7 @@ const GestionJornada = () => {
                       </div>
                     </div>
 
-                    <button 
+                    <button
                       className="btn-premium-action mt-6 w-full"
                       onClick={() => handleSelectSede(sede)}
                     >
@@ -696,28 +696,28 @@ const GestionJornada = () => {
 
           {/* Navigation Tabs */}
           <div className="tabs-container">
-            <button 
+            <button
               className={`tab-btn ${activeTab === 'horarios' ? 'active' : ''}`}
               onClick={() => setActiveTab('horarios')}
             >
               <Clock size={16} />
               Horarios creados ({horarios.length})
             </button>
-            <button 
+            <button
               className={`tab-btn ${activeTab === 'con_horario' ? 'active' : ''}`}
               onClick={() => setActiveTab('con_horario')}
             >
               <UserCheck size={16} />
               Usuarios con horario ({usuariosConHorario.length})
             </button>
-            <button 
+            <button
               className={`tab-btn ${activeTab === 'sin_horario' ? 'active' : ''}`}
               onClick={() => setActiveTab('sin_horario')}
             >
               <UserX size={16} />
               Usuarios sin horario ({usuariosSinHorario.length})
             </button>
-            <button 
+            <button
               className={`tab-btn ${activeTab === 'intercambios' ? 'active' : ''}`}
               onClick={() => setActiveTab('intercambios')}
             >
@@ -734,7 +734,7 @@ const GestionJornada = () => {
             </div>
           ) : (
             <div className="tab-content-wrapper">
-              
+
               {/* --- TAB 1: HORARIOS CREADOS --- */}
               {activeTab === 'horarios' && (
                 <div className="horarios-tab">
@@ -830,7 +830,7 @@ const GestionJornada = () => {
                               <td>{uh.vigente_hasta || 'Indefinido'}</td>
                               <td><span className="text-muted-p">{uh.observacion || '-'}</span></td>
                               <td>
-                                <button 
+                                <button
                                   className="btn-icon-p text-danger"
                                   onClick={() => handleDeleteAssignment(uh.id)}
                                   title="Remover Horario"
@@ -886,7 +886,7 @@ const GestionJornada = () => {
                                 <span className="status-badge invalid">Marcación Bloqueada</span>
                               </td>
                               <td>
-                                <button 
+                                <button
                                   className="btn btn-primary btn-sm"
                                   onClick={() => handleOpenAssignModal(u)}
                                 >
@@ -947,7 +947,7 @@ const GestionJornada = () => {
                                 </div>
                               </td>
                               <td>
-                                <button 
+                                <button
                                   className="btn-icon-p text-danger"
                                   onClick={() => handleDeleteSwap(i.id)}
                                   title="Anular Intercambio"
@@ -1166,11 +1166,11 @@ const GestionJornada = () => {
                             const isSelected = horarioForm.usuarios_asignados.includes(u.id);
                             return (
                               <label key={u.id} className={`user-select-row-p ${isSelected ? 'selected' : ''}`}>
-                                <input 
-                                  type="checkbox" 
-                                  checked={isSelected} 
-                                  onChange={() => handleToggleUserSelect(u.id)} 
-                                  className="mr-2" 
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={() => handleToggleUserSelect(u.id)}
+                                  className="mr-2"
                                 />
                                 <div className="flex flex-col">
                                   <span className="font-semibold text-sm">{u.nombre_completo}</span>
@@ -1250,15 +1250,15 @@ const GestionJornada = () => {
                   {usuariosSede.map(u => {
                     const isSelected = assignForm.usuarios.includes(u.id);
                     return (
-                      <div 
+                      <div
                         key={u.id}
                         className={`user-select-row-p ${isSelected ? 'selected' : ''}`}
                         onClick={() => handleToggleAssignUser(u.id)}
                       >
-                        <input 
-                          type="checkbox" 
+                        <input
+                          type="checkbox"
                           checked={isSelected}
-                          readOnly 
+                          readOnly
                           className="mr-2"
                         />
                         <div className="flex flex-col">
@@ -1333,8 +1333,8 @@ const GestionJornada = () => {
                 <label>Usuario Solicitante (A) *</label>
                 <select
                   value={swapForm.usuario_solicitante}
-                  onChange={(e) => setSwapForm(prev => ({ 
-                    ...prev, 
+                  onChange={(e) => setSwapForm(prev => ({
+                    ...prev,
                     usuario_solicitante: e.target.value,
                     usuario_reemplazo: prev.usuario_reemplazo === e.target.value ? '' : prev.usuario_reemplazo
                   }))}

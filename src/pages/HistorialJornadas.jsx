@@ -68,6 +68,7 @@ const HistorialJornadas = () => {
   const [mapError, setMapError] = useState(null);
   const [googleMapsLoaded, setGoogleMapsLoaded] = useState(false);
   const [lastUpdateTime, setLastUpdateTime] = useState(null);
+  const [mapRequested, setMapRequested] = useState(false);
 
   // References for Google Map to update dynamically without full re-instantiation
   const mapInstanceRef = useRef(null);
@@ -123,12 +124,11 @@ const HistorialJornadas = () => {
         setTrackingRecorrido(data);
         setLastUpdateTime(new Date());
       } else {
-        const errorData = await res.json().catch(() => ({}));
-        setMapError(errorData.error || 'No se pudo obtener el recorrido de esta jornada.');
+        setMapError('No se pudo cargar el mapa. Intente nuevamente.');
       }
     } catch (err) {
       console.error('Error fetching tracking recorrido:', err);
-      setMapError('Error al conectar con el servidor.');
+      setMapError('No se pudo cargar el mapa. Intente nuevamente.');
     } finally {
       if (!silent) setLoadingTracking(false);
     }
@@ -212,10 +212,12 @@ const HistorialJornadas = () => {
         fetchHistorial(selectedUser.id);
       } else if (selectedJornadaId) {
         fetchJornadaDetalle(selectedJornadaId);
-        fetchTrackingRecorrido(selectedJornadaId);
+        if (mapRequested) {
+          fetchTrackingRecorrido(selectedJornadaId);
+        }
       }
     }
-  }, [selectedUser, selectedJornadaId, fetchHistorial, fetchJornadaDetalle, fetchTrackingRecorrido]);
+  }, [selectedUser, selectedJornadaId, fetchHistorial, fetchJornadaDetalle, fetchTrackingRecorrido, mapRequested]);
 
   useWebSockets(onSocketMessage);
 
@@ -235,11 +237,14 @@ const HistorialJornadas = () => {
     }
   }, [usuarios, isOperativo, fetchHistorial]);
 
-  // Dynamically load Google Maps script
+  // Dynamically load Google Maps script only when requested
   useEffect(() => {
+    if (!mapRequested) return;
+
     const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
     if (!apiKey) {
       console.error('VITE_GOOGLE_MAPS_API_KEY no está definido en el archivo .env');
+      setMapError('No se pudo cargar el mapa. Api key no definida.');
       return;
     }
 
@@ -261,13 +266,16 @@ const HistorialJornadas = () => {
     script.async = true;
     script.defer = true;
     script.onload = () => setGoogleMapsLoaded(true);
-    script.onerror = () => console.error('Error al cargar la script de Google Maps');
+    script.onerror = () => {
+      console.error('Error al cargar la script de Google Maps');
+      setMapError('No se pudo cargar el mapa. Intente nuevamente.');
+    };
     document.head.appendChild(script);
-  }, []);
+  }, [mapRequested]);
 
-  // Auto-update tracking data every 60 seconds if the workday is in progress
+  // Auto-update tracking data every 60 seconds if the workday is in progress AND map is requested
   useEffect(() => {
-    if (!selectedJornadaId || !trackingRecorrido) return;
+    if (!mapRequested || !selectedJornadaId || !trackingRecorrido) return;
 
     const isEnProceso = trackingRecorrido.jornada?.estado_jornada === 'en_proceso' || 
                         !trackingRecorrido.jornada?.hora_salida;
@@ -279,7 +287,7 @@ const HistorialJornadas = () => {
     }, 60000);
 
     return () => clearInterval(intervalId);
-  }, [selectedJornadaId, trackingRecorrido, fetchTrackingRecorrido]);
+  }, [selectedJornadaId, trackingRecorrido, fetchTrackingRecorrido, mapRequested]);
 
   // Initialize and draw the Google Map when loaded and recorrido data is ready
   useEffect(() => {
@@ -543,9 +551,17 @@ const HistorialJornadas = () => {
     fetchHistorial(user.id);
   };
 
+  const handleLoadMap = () => {
+    setMapRequested(true);
+    fetchTrackingRecorrido(selectedJornadaId);
+  };
+
   const handleJornadaSelect = (jornadaId) => {
     setSelectedJornadaId(jornadaId);
-    setLastUpdateTime(new Date());
+    setMapRequested(false);
+    setLastUpdateTime(null);
+    setMapError(null);
+    setTrackingRecorrido(null);
     
     // Reset map refs to force complete recreation of map when switching journeys
     mapInstanceRef.current = null;
@@ -555,7 +571,6 @@ const HistorialJornadas = () => {
     circleRef.current = null;
     
     fetchJornadaDetalle(jornadaId);
-    fetchTrackingRecorrido(jornadaId);
   };
 
   const handleBackToUsers = () => {
@@ -565,6 +580,7 @@ const HistorialJornadas = () => {
     setJornadaDetalle(null);
     setTrackingRecorrido(null);
     setMapError(null);
+    setMapRequested(false);
     
     mapInstanceRef.current = null;
     mapJornadaIdRef.current = null;
@@ -578,6 +594,7 @@ const HistorialJornadas = () => {
     setJornadaDetalle(null);
     setTrackingRecorrido(null);
     setMapError(null);
+    setMapRequested(false);
     
     mapInstanceRef.current = null;
     mapJornadaIdRef.current = null;
@@ -1272,9 +1289,9 @@ const HistorialJornadas = () => {
                 <div className="card-header-flex">
                   <h2>Recorrido GPS</h2>
                   <div className="flex gap-2 items-center">
-                    {trackingRecorrido && (
+                    {((trackingRecorrido?.resumen?.total_puntos !== undefined ? trackingRecorrido.resumen.total_puntos : (jornadaDetalle?.total_puntos_gps || 0)) > 0) && (
                       <span className="badge-count">
-                        {trackingRecorrido.resumen.total_puntos} puntos
+                        {trackingRecorrido?.resumen?.total_puntos !== undefined ? trackingRecorrido.resumen.total_puntos : jornadaDetalle.total_puntos_gps} puntos
                       </span>
                     )}
                     {trackingRecorrido && (trackingRecorrido.jornada?.estado_jornada === 'en_proceso' || !trackingRecorrido.jornada?.hora_salida) && (
@@ -1283,147 +1300,189 @@ const HistorialJornadas = () => {
                         En Vivo (60s)
                       </span>
                     )}
+                    <button 
+                      onClick={handleLoadMap} 
+                      disabled={loadingTracking}
+                      className="btn-map-control"
+                    >
+                      {loadingTracking ? (
+                        <>
+                          <span className="map-btn-spinner"></span>
+                          Cargando...
+                        </>
+                      ) : (
+                        (!mapRequested || mapError) ? "Cargar mapa de recorrido" : "Actualizar recorrido"
+                      )}
+                    </button>
                   </div>
                 </div>
 
-                {loadingTracking ? (
-                  <div className="loading-state">
-                    <div className="spinner"></div>
-                    <p>Cargando recorrido GPS...</p>
-                  </div>
-                ) : mapError ? (
-                  <div className="empty-state text-center p-8">
-                    <AlertCircle size={40} className="text-danger mb-2" />
-                    <p className="text-gray-600">{mapError}</p>
-                  </div>
-                ) : !trackingRecorrido ? (
-                  <div className="empty-state text-center p-8">
-                    <MapPin size={40} className="text-muted mb-2" />
-                    <p className="text-gray-600">Aún no se recuperan los datos de seguimiento.</p>
-                  </div>
-                ) : (
-                  <div className="gps-section-layout">
-                    {/* Map Container */}
-                    <div className="google-map-wrapper">
+                <div className="gps-section-layout">
+                  {/* Map Container */}
+                  <div className="google-map-wrapper">
+                    {/* Loader Overlay */}
+                    {loadingTracking && (
+                      <div className="map-loading-overlay">
+                        <div className="spinner"></div>
+                        <p className="font-semibold text-white">Cargando mapa y recorrido GPS...</p>
+                      </div>
+                    )}
+                    
+                    {/* Error Overlay */}
+                    {mapError && !loadingTracking && (
+                      <div className="map-error-overlay">
+                        <AlertCircle size={40} className="text-rose-500 mb-2" />
+                        <p className="font-semibold text-white">No se pudo cargar el mapa. Intente nuevamente.</p>
+                        <button onClick={handleLoadMap} className="btn-map-control mt-4">
+                          Intentar nuevamente
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Placeholder Overlay if not requested yet */}
+                    {!mapRequested && !loadingTracking && !mapError && (
+                      <div className="map-placeholder-overlay">
+                        <MapPin size={48} className="text-emerald-500 mb-3 pulse-pin" />
+                        <p className="text-gray-300 font-semibold mb-4 text-lg">El mapa interactivo se cargará bajo demanda.</p>
+                        <button onClick={handleLoadMap} className="btn-map-control">
+                          Cargar mapa de recorrido
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Empty coordinates banner if loaded but points list is empty */}
+                    {mapRequested && !loadingTracking && !mapError && trackingRecorrido && (!trackingRecorrido.puntos || trackingRecorrido.puntos.length === 0) && (
+                      <div className="map-empty-overlay">
+                        <AlertCircle size={40} className="text-amber-500 mb-2" />
+                        <p className="font-semibold text-white">No se registraron puntos GPS para esta jornada.</p>
+                      </div>
+                    )}
+
+                    {/* Google Map canvas container (rendered only when map is requested) */}
+                    {mapRequested && (
                       <div ref={mapContainerRef} id="google-map-container" className="google-map-canvas">
-                        {!googleMapsLoaded && (
-                          <div className="loading-state" style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1rem' }}>
+                        {!googleMapsLoaded && !mapError && (
+                          <div className="loading-state" style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1rem', background: '#0b0f19' }}>
                             <div className="spinner"></div>
-                            <p>Cargando Google Maps...</p>
+                            <p className="text-gray-400">Cargando Google Maps...</p>
                           </div>
                         )}
                       </div>
-                      {(!trackingRecorrido.puntos || trackingRecorrido.puntos.length === 0) && (
-                        <div className="no-gps-points-banner">
-                          <AlertCircle size={16} className="text-warning mr-2" />
-                          <span>Aún no se registran puntos de recorrido GPS para esta jornada.</span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Metrics Sidebar */}
-                    <div className="gps-metrics-sidebar">
-                      <h3>Resumen del Recorrido</h3>
-                      
-                      {trackingRecorrido.resumen.ultima_ubicacion && (
-                        <div className="gps-metric-tile">
-                          <span className="tile-label">Estado de zona</span>
-                          <span className={`tile-value font-bold ${trackingRecorrido.resumen.ultima_ubicacion.es_fuera_de_zona ? 'text-danger' : 'text-success'}`}>
-                            {trackingRecorrido.resumen.ultima_ubicacion.es_fuera_de_zona ? 'FUERA DE ZONA' : 'DENTRO DE ZONA'}
-                          </span>
-                        </div>
-                      )}
-
-                      {trackingRecorrido.resumen.ultima_ubicacion && (
-                        <div className="gps-metric-tile">
-                          <span className="tile-label">Distancia a la sede</span>
-                          <span className="tile-value font-semibold">
-                            {trackingRecorrido.resumen.ultima_ubicacion.distancia_sede_metros !== null
-                              ? `${Math.round(trackingRecorrido.resumen.ultima_ubicacion.distancia_sede_metros)} metros`
-                              : 'No disponible'}
-                          </span>
-                        </div>
-                      )}
-
-                      <div className="gps-metric-tile">
-                        <span className="tile-label">Última actualización de datos</span>
-                        <span className="tile-value font-semibold text-info">
-                          {lastUpdateTime ? lastUpdateTime.toLocaleTimeString() : '--:--'}
-                        </span>
-                      </div>
-
-                      <div className="gps-metric-tile">
-                        <span className="tile-label">Total de puntos registrados</span>
-                        <span className="tile-value">{trackingRecorrido.resumen.total_puntos}</span>
-                      </div>
-
-                      <div className="gps-metric-tile">
-                        <span className="tile-label">Puntos fuera de zona</span>
-                        <span className={`tile-value ${trackingRecorrido.resumen.total_fuera_de_zona > 0 ? 'text-warning font-bold' : ''}`}>
-                          {trackingRecorrido.resumen.total_fuera_de_zona}
-                        </span>
-                      </div>
-
-                      {trackingRecorrido.sede && (
-                        <div className="gps-metric-tile gps-tile-full">
-                          <span className="tile-label">Ubicación Sede/Local</span>
-                          <span className="tile-value subtext">
-                            <strong>{trackingRecorrido.sede.nombre || 'Asignada'}</strong>
-                            <span className="coordinates">
-                              (Radio: {trackingRecorrido.sede.radio_metros || 0} metros)
-                            </span>
-                          </span>
-                        </div>
-                      )}
-
-                      {trackingRecorrido.resumen.primera_ubicacion && (
-                        <div className="gps-metric-tile gps-tile-full">
-                          <span className="tile-label">Primera ubicación</span>
-                          <span className="tile-value subtext">
-                            <strong>{formatTime(trackingRecorrido.resumen.primera_ubicacion.fecha_hora)}</strong>
-                            <span className="coordinates">
-                              ({trackingRecorrido.resumen.primera_ubicacion.latitud.toFixed(5)}, {trackingRecorrido.resumen.primera_ubicacion.longitud.toFixed(5)})
-                            </span>
-                          </span>
-                        </div>
-                      )}
-
-                      {trackingRecorrido.resumen.ultima_ubicacion && (
-                        <div className="gps-metric-tile gps-tile-full">
-                          <span className="tile-label">Última ubicación</span>
-                          <span className="tile-value subtext">
-                            <strong>{formatTime(trackingRecorrido.resumen.ultima_ubicacion.fecha_hora)}</strong>
-                            <span className="coordinates">
-                              ({trackingRecorrido.resumen.ultima_ubicacion.latitud.toFixed(5)}, {trackingRecorrido.resumen.ultima_ubicacion.longitud.toFixed(5)})
-                            </span>
-                          </span>
-                        </div>
-                      )}
-
-                      {trackingRecorrido.resumen.ultima_ubicacion && (
-                        <div className="gps-two-column gps-tile-full">
-                          {trackingRecorrido.resumen.ultima_ubicacion.bateria_porcentaje !== null && (
-                            <div className="gps-metric-tile">
-                              <span className="tile-label">Batería última</span>
-                              <span className="tile-value font-semibold">
-                                {trackingRecorrido.resumen.ultima_ubicacion.bateria_porcentaje}%
-                              </span>
-                            </div>
-                          )}
-                          
-                          {trackingRecorrido.resumen.ultima_ubicacion.precision_metros !== null && (
-                            <div className="gps-metric-tile">
-                              <span className="tile-label">Precisión última</span>
-                              <span className="tile-value font-semibold">
-                                {Math.round(trackingRecorrido.resumen.ultima_ubicacion.precision_metros)} m
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
+                    )}
                   </div>
-                )}
+
+                  {/* Metrics Sidebar */}
+                  <div className="gps-metrics-sidebar">
+                    <h3>Resumen del Recorrido</h3>
+                    
+                    <div className="gps-metric-tile">
+                      <span className="tile-label">Estado de zona</span>
+                      <span className={`tile-value font-bold ${
+                        trackingRecorrido?.resumen?.ultima_ubicacion
+                          ? (trackingRecorrido.resumen.ultima_ubicacion.es_fuera_de_zona ? 'text-danger' : 'text-success')
+                          : 'text-slate-500'
+                      }`}>
+                        {trackingRecorrido?.resumen?.ultima_ubicacion
+                          ? (trackingRecorrido.resumen.ultima_ubicacion.es_fuera_de_zona ? 'FUERA DE ZONA' : 'DENTRO DE ZONA')
+                          : 'SIN CARGAR'}
+                      </span>
+                    </div>
+
+                    <div className="gps-metric-tile">
+                      <span className="tile-label">Distancia a la sede</span>
+                      <span className="tile-value font-semibold">
+                        {trackingRecorrido?.resumen?.ultima_ubicacion
+                          ? (trackingRecorrido.resumen.ultima_ubicacion.distancia_sede_metros !== null
+                              ? `${Math.round(trackingRecorrido.resumen.ultima_ubicacion.distancia_sede_metros)} metros`
+                              : 'No disponible')
+                          : 'SIN CARGAR'}
+                      </span>
+                    </div>
+
+                    <div className="gps-metric-tile">
+                      <span className="tile-label">Última actualización de datos</span>
+                      <span className="tile-value font-semibold text-info">
+                        {lastUpdateTime ? lastUpdateTime.toLocaleTimeString() : 'SIN CARGAR'}
+                      </span>
+                    </div>
+
+                    <div className="gps-metric-tile">
+                      <span className="tile-label">Total de puntos registrados</span>
+                      <span className="tile-value">
+                        {trackingRecorrido?.resumen?.total_puntos !== undefined
+                          ? trackingRecorrido.resumen.total_puntos
+                          : (jornadaDetalle?.total_puntos_gps || 0)}
+                      </span>
+                    </div>
+
+                    <div className="gps-metric-tile">
+                      <span className="tile-label">Puntos fuera de zona</span>
+                      <span className={`tile-value ${trackingRecorrido?.resumen?.total_fuera_de_zona > 0 ? 'text-warning font-bold' : ''}`}>
+                        {trackingRecorrido?.resumen?.total_fuera_de_zona !== undefined
+                          ? trackingRecorrido.resumen.total_fuera_de_zona
+                          : 'SIN CARGAR'}
+                      </span>
+                    </div>
+
+                    <div className="gps-metric-tile gps-tile-full">
+                      <span className="tile-label">Ubicación Sede/Local</span>
+                      <span className="tile-value subtext">
+                        <strong>{trackingRecorrido?.sede?.nombre || jornadaDetalle?.sede || 'Asignada'}</strong>
+                        {trackingRecorrido?.sede && (
+                          <span className="coordinates">
+                            (Radio: {trackingRecorrido.sede.radio_metros || 0} metros)
+                          </span>
+                        )}
+                      </span>
+                    </div>
+
+                    {trackingRecorrido?.resumen?.primera_ubicacion && (
+                      <div className="gps-metric-tile gps-tile-full">
+                        <span className="tile-label">Primera ubicación</span>
+                        <span className="tile-value subtext">
+                          <strong>{formatTime(trackingRecorrido.resumen.primera_ubicacion.fecha_hora)}</strong>
+                          <span className="coordinates">
+                            ({trackingRecorrido.resumen.primera_ubicacion.latitud.toFixed(5)}, {trackingRecorrido.resumen.primera_ubicacion.longitud.toFixed(5)})
+                          </span>
+                        </span>
+                      </div>
+                    )}
+
+                    {trackingRecorrido?.resumen?.ultima_ubicacion && (
+                      <div className="gps-metric-tile gps-tile-full">
+                        <span className="tile-label">Última ubicación</span>
+                        <span className="tile-value subtext">
+                          <strong>{formatTime(trackingRecorrido.resumen.ultima_ubicacion.fecha_hora)}</strong>
+                          <span className="coordinates">
+                            ({trackingRecorrido.resumen.ultima_ubicacion.latitud.toFixed(5)}, {trackingRecorrido.resumen.ultima_ubicacion.longitud.toFixed(5)})
+                          </span>
+                        </span>
+                      </div>
+                    )}
+
+                    {trackingRecorrido?.resumen?.ultima_ubicacion && (
+                      <div className="gps-two-column gps-tile-full">
+                        {trackingRecorrido.resumen.ultima_ubicacion.bateria_porcentaje !== null && (
+                          <div className="gps-metric-tile">
+                            <span className="tile-label">Batería última</span>
+                            <span className="tile-value font-semibold">
+                              {trackingRecorrido.resumen.ultima_ubicacion.bateria_porcentaje}%
+                            </span>
+                          </div>
+                        )}
+                        
+                        {trackingRecorrido.resumen.ultima_ubicacion.precision_metros !== null && (
+                          <div className="gps-metric-tile">
+                            <span className="tile-label">Precisión última</span>
+                            <span className="tile-value font-semibold">
+                              {Math.round(trackingRecorrido.resumen.ultima_ubicacion.precision_metros)} m
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
               </>
             )}

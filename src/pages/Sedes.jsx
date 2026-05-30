@@ -5,7 +5,7 @@ import MainLayout from '../layouts/MainLayout';
 import { useNotification } from '../context/NotificationContext';
 import './Sedes.css';
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://apifincontrol.finatech.com.pe/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
 
 const darkMapStyle = [
   { elementType: 'geometry', stylers: [{ color: '#0f172a' }] },
@@ -398,12 +398,12 @@ const Sedes = () => {
 
     if (hasCoords) {
       const pos = { lat, lng };
-      
+
       if (markerRef.current) {
         markerRef.current.position = pos;
         markerRef.current.map = googleMapInstanceRef.current;
       }
-      
+
       if (circleRef.current) {
         circleRef.current.setCenter(pos);
         circleRef.current.setRadius(parseFloat(formData.radio_metros) || 100);
@@ -583,23 +583,23 @@ const Sedes = () => {
                   <div className="form-row">
                     <div className="form-group">
                       <label>Nombre de la Sede</label>
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         name="nombre"
-                        value={formData.nombre} 
-                        onChange={handleInputChange} 
-                        required 
+                        value={formData.nombre}
+                        onChange={handleInputChange}
+                        required
                         className="input-field"
                         placeholder="Ej. Oficina Principal"
                       />
                     </div>
                     <div className="form-group">
                       <label>Código (Opcional)</label>
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         name="codigo"
-                        value={formData.codigo} 
-                        onChange={handleInputChange} 
+                        value={formData.codigo}
+                        onChange={handleInputChange}
                         className="input-field"
                         placeholder="Ej. S-01"
                       />
@@ -608,11 +608,11 @@ const Sedes = () => {
 
                   <div className="form-group">
                     <label>Dirección (Opcional)</label>
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       name="direccion"
-                      value={formData.direccion} 
-                      onChange={handleInputChange} 
+                      value={formData.direccion}
+                      onChange={handleInputChange}
                       className="input-field"
                       placeholder="Ej. Av. Siempre Viva 123"
                     />
@@ -620,11 +620,11 @@ const Sedes = () => {
 
                   <div className="form-group">
                     <label>Referencia (Opcional)</label>
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       name="referencia"
-                      value={formData.referencia} 
-                      onChange={handleInputChange} 
+                      value={formData.referencia}
+                      onChange={handleInputChange}
                       className="input-field"
                       placeholder="Ej. Frente al parque"
                     />
@@ -633,24 +633,24 @@ const Sedes = () => {
                   <div className="form-row">
                     <div className="form-group">
                       <label>Latitud (Opcional)</label>
-                      <input 
-                        type="number" 
+                      <input
+                        type="number"
                         step="any"
                         name="latitud"
-                        value={formData.latitud} 
-                        onChange={handleInputChange} 
+                        value={formData.latitud}
+                        onChange={handleInputChange}
                         className="input-field"
                         placeholder="-12.046374"
                       />
                     </div>
                     <div className="form-group">
                       <label>Longitud (Opcional)</label>
-                      <input 
-                        type="number" 
+                      <input
+                        type="number"
                         step="any"
                         name="longitud"
-                        value={formData.longitud} 
-                        onChange={handleInputChange} 
+                        value={formData.longitud}
+                        onChange={handleInputChange}
                         className="input-field"
                         placeholder="-77.042793"
                       />
@@ -660,23 +660,23 @@ const Sedes = () => {
                   <div className="form-row">
                     <div className="form-group">
                       <label>Radio de tolerancia (metros) (Opcional)</label>
-                      <input 
-                        type="number" 
+                      <input
+                        type="number"
                         name="radio_metros"
-                        value={formData.radio_metros} 
-                        onChange={handleInputChange} 
+                        value={formData.radio_metros}
+                        onChange={handleInputChange}
                         min="10"
                         className="input-field"
                       />
                     </div>
-                    
+
                     <div className="form-group checkbox-group">
                       <label className="checkbox-label">
-                        <input 
-                          type="checkbox" 
+                        <input
+                          type="checkbox"
                           name="activo"
-                          checked={formData.activo} 
-                          onChange={handleInputChange} 
+                          checked={formData.activo}
+                          onChange={handleInputChange}
                         />
                         <span>Sede Activa</span>
                       </label>
@@ -691,7 +691,7 @@ const Sedes = () => {
                     <p className="map-help-text">
                       Busca una dirección o selecciona un punto en el mapa para capturar la ubicación de la sede.
                     </p>
-                    
+
                     {import.meta.env.VITE_GOOGLE_MAPS_API_KEY ? (
                       <>
                         <div className="map-search-container">
@@ -705,7 +705,7 @@ const Sedes = () => {
                             onChange={(e) => setSearchInputValue(e.target.value)}
                           />
                         </div>
-                        
+
                         <div className="map-canvas-container">
                           {!mapsLoaded && (
                             <div className="map-loading-overlay">
