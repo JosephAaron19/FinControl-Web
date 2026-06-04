@@ -11,7 +11,14 @@ import {
   User,
   AlertCircle,
   Activity,
-  CheckCircle
+  CheckCircle,
+  Building2,
+  Users,
+  MinusCircle,
+  ChevronLeft,
+  IdCard,
+  Eye,
+  XCircle
 } from 'lucide-react';
 import MainLayout from '../layouts/MainLayout';
 import useWebSockets from '../hooks/useWebSockets';
@@ -61,6 +68,9 @@ const HistorialJornadas = () => {
   const [loadingSedes, setLoadingSedes] = useState(true);
   const [roleFilter, setRoleFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [userCurrentPage, setUserCurrentPage] = useState(1);
+  const [jornadasCurrentPage, setJornadasCurrentPage] = useState(1);
+  const [jornadasPerPage, setJornadasPerPage] = useState(10);
 
   // GPS tracking states
   const [trackingRecorrido, setTrackingRecorrido] = useState(null);
@@ -157,11 +167,7 @@ const HistorialJornadas = () => {
     setLoadingSedes(true);
     const token = localStorage.getItem('access_token');
     try {
-      const queryParams = new URLSearchParams();
-      if (filters.fecha_inicio) queryParams.append('fecha_inicio', filters.fecha_inicio);
-      if (filters.fecha_fin) queryParams.append('fecha_fin', filters.fecha_fin);
-
-      const res = await fetch(`${API_URL}/sedes/historial-resumen/?${queryParams.toString()}`, {
+      const res = await fetch(`${API_URL}/sedes/historial-resumen/`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {
@@ -173,7 +179,7 @@ const HistorialJornadas = () => {
     } finally {
       setLoadingSedes(false);
     }
-  }, [filters.fecha_inicio, filters.fecha_fin]);
+  }, []);
 
   const fetchUsuarios = useCallback(async (sedeId = null) => {
     setLoadingUsers(true);
@@ -201,6 +207,7 @@ const HistorialJornadas = () => {
     setRoleFilter('');
     setStatusFilter('');
     setSearchTerm('');
+    setUserCurrentPage(1);
     fetchUsuarios(sede.sede_id);
   };
 
@@ -548,6 +555,8 @@ const HistorialJornadas = () => {
 
   const handleUserSelect = (user) => {
     setSelectedUser(user);
+    setJornadasCurrentPage(1);
+    setJornadasPerPage(10);
     fetchHistorial(user.id);
   };
 
@@ -581,6 +590,7 @@ const HistorialJornadas = () => {
     setTrackingRecorrido(null);
     setMapError(null);
     setMapRequested(false);
+    setUserCurrentPage(1);
     
     mapInstanceRef.current = null;
     mapJornadaIdRef.current = null;
@@ -682,6 +692,31 @@ const HistorialJornadas = () => {
     return new Date(isoString).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
+  const formatMemberSince = (dateString) => {
+    if (!dateString) return '12 may. 2024';
+    try {
+      const date = new Date(dateString);
+      const months = ['ene.', 'feb.', 'mar.', 'abr.', 'may.', 'jun.', 'jul.', 'ago.', 'sep.', 'oct.', 'nov.', 'dic.'];
+      const day = date.getDate();
+      const month = months[date.getMonth()];
+      const year = date.getFullYear();
+      return `${day} ${month} ${year}`;
+    } catch (e) {
+      return '12 may. 2024';
+    }
+  };
+
+  const getAvatarGradient = (userId) => {
+    const gradients = [
+      'linear-gradient(135deg, #0ea5e9, #2563eb)',
+      'linear-gradient(135deg, #0d9488, #10b981)',
+      'linear-gradient(135deg, #7c3aed, #a855f7)',
+      'linear-gradient(135deg, #ea580c, #f97316)',
+      'linear-gradient(135deg, #db2777, #ec4899)'
+    ];
+    return gradients[(userId || 0) % gradients.length];
+  };
+
   const filteredUsers = usuarios.filter(u => {
     const matchesSearch = u.nombre_completo.toLowerCase().includes(searchTerm.toLowerCase()) || u.dni.includes(searchTerm);
     const matchesRole = !roleFilter || (u.rol_info?.codigo || '').toLowerCase() === roleFilter.toLowerCase();
@@ -702,22 +737,7 @@ const HistorialJornadas = () => {
         {!isOperativo && !selectedSede ? (
           /* LEVEL 0: SEDE SELECTION */
           <div className="sedes-selection-view animate-in">
-            {/* Date Filters Card */}
-            <div className="card filters-card">
-              <form onSubmit={(e) => { e.preventDefault(); fetchSedesResumen(); }} className="filters-grid">
-                <div className="filter-group">
-                  <label><Calendar size={16} /> Desde</label>
-                  <input type="date" name="fecha_inicio" value={filters.fecha_inicio} onChange={handleFilterChange} className="input-field" />
-                </div>
-                <div className="filter-group">
-                  <label><Calendar size={16} /> Hasta</label>
-                  <input type="date" name="fecha_fin" value={filters.fecha_fin} onChange={handleFilterChange} className="input-field" />
-                </div>
-                <div className="filter-actions">
-                  <button type="submit" className="btn-primary"><Search size={18} /> Filtrar Sedes</button>
-                </div>
-              </form>
-            </div>
+
 
             {loadingSedes ? (
               <div className="loading-state">
@@ -734,15 +754,15 @@ const HistorialJornadas = () => {
                 {sedesResumen.map(sede => (
                   <div key={sede.sede_id} className="sede-card card">
                     <div className="sede-card-header">
-                      <div className="sede-icon-wrapper">
-                        <MapPin size={24} />
+                      <div className="sede-icon-wrapper bg-blue-50 text-blue-500">
+                        <MapPin size={20} />
                       </div>
                       <h3>{sede.sede_nombre}</h3>
                     </div>
                     
                     <div className="sede-card-body">
                       <div className="sede-metrics-section">
-                        <h4>Personal</h4>
+                        <h4>PERSONAL</h4>
                         <div className="sede-metric-row">
                           <span>Operadores:</span>
                           <strong>{sede.cantidad_operadores}</strong>
@@ -754,39 +774,37 @@ const HistorialJornadas = () => {
                       </div>
 
                       <div className="sede-metrics-section">
-                        <h4>Jornadas</h4>
+                        <h4>JORNADAS</h4>
                         <div className="sede-metric-row">
                           <span>Registradas:</span>
                           <strong>{sede.jornadas_registradas}</strong>
                         </div>
                         <div className="sede-metric-row">
                           <span>En proceso:</span>
-                          <span className="text-warning font-semibold">{sede.jornadas_en_proceso}</span>
+                          <strong>{sede.jornadas_en_proceso}</strong>
                         </div>
                         <div className="sede-metric-row">
                           <span>Completas:</span>
-                          <span className="text-success font-semibold">{sede.jornadas_completas}</span>
+                          <strong>{sede.jornadas_completas}</strong>
                         </div>
                         <div className="sede-metric-row">
                           <span>Ausencias:</span>
-                          <span className="text-danger font-semibold">{sede.ausencias}</span>
+                          <strong>{sede.ausencias}</strong>
                         </div>
                       </div>
 
                       <div className="sede-metrics-section">
-                        <h4>Incidencias</h4>
+                        <h4>INCIDENCIAS</h4>
                         <div className="sede-metric-row">
                           <span>Reportadas:</span>
-                          <span className={sede.incidencias > 0 ? "text-danger font-bold" : "font-semibold"}>
-                            {sede.incidencias}
-                          </span>
+                          <strong>{sede.incidencias}</strong>
                         </div>
                       </div>
                     </div>
 
                     <div className="sede-card-footer">
                       <button 
-                        className="btn btn-primary w-full justify-center" 
+                        className="btn-ver-usuarios" 
                         onClick={() => handleSedeSelect(sede)}
                       >
                         Ver usuarios
@@ -803,53 +821,111 @@ const HistorialJornadas = () => {
             {!isOperativo && (
               <div className="view-actions">
                 <button className="btn-back" onClick={() => setSelectedSede(null)}>
-                  <ChevronRight size={20} style={{ transform: 'rotate(180deg)' }} /> Volver a Sedes
+                  <ChevronLeft size={16} /> Volver a Sedes
                 </button>
               </div>
             )}
 
-            <div className="card selection-header-with-filters">
-              <div className="sede-details-title mb-4">
+            {/* Sede details header and KPIs */}
+            <div className="sede-details-header mb-6">
+              <div className="sede-title-box">
+                <div className="sede-icon-box bg-blue-50 text-blue-500">
+                  <Building2 size={24} />
+                </div>
                 <h2>Usuarios de Sede: {selectedSede?.sede_nombre}</h2>
               </div>
-              <div className="user-filters-grid">
-                {/* Search input */}
-                <div className="search-wrapper">
-                  <Search size={20} className="search-icon" />
-                  <input 
-                    type="text" 
-                    placeholder="Buscar usuario por nombre o DNI..." 
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="search-input"
-                  />
+              
+              <div className="sede-kpis-row">
+                <div className="sede-kpi-card card">
+                  <div className="kpi-icon-box bg-blue-50 text-blue-500">
+                    <Users size={18} />
+                  </div>
+                  <div className="kpi-content">
+                    <span className="kpi-label">Total usuarios</span>
+                    <span className="kpi-value">{usuarios.length}</span>
+                  </div>
                 </div>
+                
+                <div className="sede-kpi-card card">
+                  <div className="kpi-icon-box bg-emerald-50 text-emerald-500">
+                    <CheckCircle size={18} />
+                  </div>
+                  <div className="kpi-content">
+                    <span className="kpi-label">Activos</span>
+                    <span className="kpi-value">{usuarios.filter(u => u.activo).length}</span>
+                  </div>
+                </div>
+                
+                <div className="sede-kpi-card card">
+                  <div className="kpi-icon-box bg-purple-50 text-purple-500">
+                    <User size={18} />
+                  </div>
+                  <div className="kpi-content">
+                    <span className="kpi-label">Asesores</span>
+                    <span className="kpi-value">
+                      {usuarios.filter(u => (u.rol_info?.codigo || '').toLowerCase() === 'asesor').length}
+                    </span>
+                  </div>
+                </div>
+                
+                <div className="sede-kpi-card card">
+                  <div className="kpi-icon-box bg-teal-50 text-teal-500">
+                    <MinusCircle size={18} />
+                  </div>
+                  <div className="kpi-content">
+                    <span className="kpi-label">Inactivos</span>
+                    <span className="kpi-value">{usuarios.filter(u => !u.activo).length}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
 
-                {/* Role select */}
-                <div className="filter-select-group">
-                  <select 
-                    value={roleFilter} 
-                    onChange={(e) => setRoleFilter(e.target.value)}
-                    className="input-field"
-                  >
-                    <option value="">Todos los Roles</option>
-                    <option value="operador">Operadores</option>
-                    <option value="asesor">Asesores</option>
-                  </select>
-                </div>
+            {/* Custom filters toolbar */}
+            <div className="user-filters-toolbar card mb-6">
+              <div className="search-filter-input-wrapper">
+                <Search size={18} className="filter-input-icon" />
+                <input 
+                  type="text" 
+                  placeholder="Buscar usuario por nombre o DNI..." 
+                  value={searchTerm}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    setUserCurrentPage(1);
+                  }}
+                  className="filter-search-input"
+                />
+              </div>
 
-                {/* Status select */}
-                <div className="filter-select-group">
-                  <select 
-                    value={statusFilter} 
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                    className="input-field"
-                  >
-                    <option value="">Todos los Estados</option>
-                    <option value="active">Activos</option>
-                    <option value="inactive">Inactivos</option>
-                  </select>
-                </div>
+              <div className="select-filter-wrapper">
+                <User size={18} className="filter-select-icon" />
+                <select 
+                  value={roleFilter} 
+                  onChange={(e) => {
+                    setRoleFilter(e.target.value);
+                    setUserCurrentPage(1);
+                  }}
+                  className="filter-select-native"
+                >
+                  <option value="">Todos los Roles</option>
+                  <option value="operador">Operadores</option>
+                  <option value="asesor">Asesores</option>
+                </select>
+              </div>
+
+              <div className="select-filter-wrapper">
+                <MinusCircle size={18} className="filter-select-icon" />
+                <select 
+                  value={statusFilter} 
+                  onChange={(e) => {
+                    setStatusFilter(e.target.value);
+                    setUserCurrentPage(1);
+                  }}
+                  className="filter-select-native"
+                >
+                  <option value="">Todos los Estados</option>
+                  <option value="active">Activos</option>
+                  <option value="inactive">Inactivos</option>
+                </select>
               </div>
             </div>
 
@@ -863,131 +939,481 @@ const HistorialJornadas = () => {
                 <AlertCircle size={48} />
                 <p>Esta sede aún no tiene usuarios que coincidan con la búsqueda.</p>
               </div>
-            ) : (
-              <div className="users-grid">
-                {filteredUsers.map(user => (
-                  <div 
-                    key={user.id} 
-                    className="user-selection-card card"
-                    onClick={() => handleUserSelect(user)}
-                  >
-                    <div className="user-card-avatar">
-                      {user.nombre_completo.charAt(0)}
-                    </div>
-                    <div className="user-card-info">
-                      <h3>{user.nombre_completo}</h3>
-                      <p><User size={14} /> {user.dni}</p>
-                      <div className="flex gap-2 items-center flex-wrap mt-1">
-                        <span className={`role-badge mini ${(user.rol_info?.codigo || '').toLowerCase()}`}>
-                          {user.rol_info?.name || user.rol_info?.nombre || 'Sin Rol'}
-                        </span>
-                        <span className={`status-badge small ${user.activo ? 'valid' : 'invalid'}`} style={{ padding: '0.1rem 0.4rem', fontSize: '0.65rem' }}>
-                          {user.activo ? 'Activo' : 'Inactivo'}
-                        </span>
+            ) : (() => {
+              const itemsPerPage = 10;
+              const indexOfLastItem = userCurrentPage * itemsPerPage;
+              const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+              const currentUsers = filteredUsers.slice(indexOfFirstItem, indexOfLastItem);
+              const totalPages = Math.ceil(filteredUsers.length / itemsPerPage) || 1;
+
+              return (
+                <>
+                  <div className="users-card-grid">
+                    {currentUsers.map(user => (
+                      <div 
+                        key={user.id} 
+                        className="user-item-card card"
+                        onClick={() => handleUserSelect(user)}
+                      >
+                        <div className="user-card-body-layout">
+                          <div 
+                            className="user-card-avatar-circle"
+                            style={{ background: getAvatarGradient(user.id) }}
+                          >
+                            {user.nombre_completo.charAt(0)}
+                          </div>
+                          <div className="user-card-main-info">
+                            <h3>{user.nombre_completo}</h3>
+                            <p className="dni-info-row">
+                              <IdCard size={14} className="text-slate-400" />
+                              <span>DNI {user.dni}</span>
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="card-divider-dotted" />
+
+                        <div className="user-card-badges-row">
+                          <span className={`role-badge-pill ${(user.rol_info?.codigo || '').toLowerCase()}`}>
+                            {user.rol_info?.name || user.rol_info?.nombre || 'Sin Rol'}
+                          </span>
+                          <span className={`status-badge-pill ${user.activo ? 'activo' : 'inactivo'}`}>
+                            {user.activo ? 'ACTIVO' : 'INACTIVO'}
+                          </span>
+                        </div>
+
+                        <div className="user-card-footer-layout">
+                          <div className="member-since-box">
+                            <Calendar size={14} className="text-slate-400" />
+                            <span>Miembro desde {formatMemberSince(user.creado_at)}</span>
+                          </div>
+                          <button className="btn-card-action">
+                            <span>Ver historial</span>
+                            <ChevronRight size={14} />
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                    <ChevronRight size={20} className="arrow-icon" />
+                    ))}
                   </div>
-                ))}
-              </div>
-            )}
+
+                  {/* Pagination footer */}
+                  <div className="users-pagination-footer card">
+                    <span className="pagination-info-text">
+                      Mostrando {filteredUsers.length > 0 ? indexOfFirstItem + 1 : 0} a {Math.min(indexOfLastItem, filteredUsers.length)} de {filteredUsers.length} usuarios
+                    </span>
+                    
+                    <div className="pagination-controls-box">
+                      <button
+                        className="btn-pagination-nav"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setUserCurrentPage(prev => Math.max(1, prev - 1));
+                        }}
+                        disabled={userCurrentPage === 1}
+                      >
+                        <ChevronLeft size={16} />
+                      </button>
+                      <span className="pagination-current-page-num">
+                        {userCurrentPage}
+                      </span>
+                      <button
+                        className="btn-pagination-nav"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setUserCurrentPage(prev => Math.min(totalPages, prev + 1));
+                        }}
+                        disabled={userCurrentPage === totalPages}
+                      >
+                        <ChevronRight size={16} />
+                      </button>
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
           </div>
         ) : !selectedJornadaId ? (
           /* LEVEL 2: JORNADA LIST FOR USER */
           <div className="history-detail-view animate-in">
             <div className="view-actions">
               <button className="btn-back" onClick={handleBackToUsers}>
-                <ChevronRight size={20} style={{ transform: 'rotate(180deg)' }} /> Volver a usuarios
+                <ChevronLeft size={16} /> Volver a usuarios
               </button>
             </div>
 
-            <div className="card filters-card">
-              <form onSubmit={applyFilters} className="filters-grid">
-                <div className="filter-group">
-                  <label><Calendar size={16} /> Desde</label>
-                  <input type="date" name="fecha_inicio" value={filters.fecha_inicio} onChange={handleFilterChange} className="input-field" />
+            {/* Premium Date & Attendance Filters Card */}
+            <div className="card journeys-filters-card mb-6">
+              <form onSubmit={applyFilters} className="journeys-filters-grid">
+                <div className="filter-item-box">
+                  <span className="filter-item-label">Desde</span>
+                  <div className="date-input-wrapper-styled">
+                    <Calendar size={18} className="date-icon-left" />
+                    <input 
+                      type="date" 
+                      name="fecha_inicio" 
+                      value={filters.fecha_inicio} 
+                      onChange={handleFilterChange} 
+                      className="date-input-native" 
+                    />
+                  </div>
                 </div>
-                <div className="filter-group">
-                  <label><Calendar size={16} /> Hasta</label>
-                  <input type="date" name="fecha_fin" value={filters.fecha_fin} onChange={handleFilterChange} className="input-field" />
+
+                <div className="filter-item-box">
+                  <span className="filter-item-label">Hasta</span>
+                  <div className="date-input-wrapper-styled">
+                    <Calendar size={18} className="date-icon-left" />
+                    <input 
+                      type="date" 
+                      name="fecha_fin" 
+                      value={filters.fecha_fin} 
+                      onChange={handleFilterChange} 
+                      className="date-input-native" 
+                    />
+                  </div>
                 </div>
-                <div className="filter-group">
-                  <label><Filter size={16} /> Asistencia</label>
-                  <select name="estado_asistencia" value={filters.estado_asistencia} onChange={handleFilterChange} className="input-field">
-                    <option value="">Todos los estados</option>
-                    <option value="programada">Programada</option>
-                    <option value="en_proceso">En proceso</option>
-                    <option value="completa">Completa</option>
-                    <option value="incompleta">Incompleta</option>
-                    <option value="ausente">Ausente</option>
-                  </select>
+
+                <div className="filter-item-box select-box">
+                  <span className="filter-item-label">Asistencia</span>
+                  <div className="select-input-wrapper-styled">
+                    <Filter size={16} className="select-icon-left" />
+                    <select 
+                      name="estado_asistencia" 
+                      value={filters.estado_asistencia} 
+                      onChange={handleFilterChange} 
+                      className="select-input-native"
+                    >
+                      <option value="">Todos los estados</option>
+                      <option value="programada">Programada</option>
+                      <option value="en_proceso">En proceso</option>
+                      <option value="completa">Completa</option>
+                      <option value="incompleta">Incompleta</option>
+                      <option value="ausente">Ausente</option>
+                    </select>
+                  </div>
                 </div>
-                <div className="filter-actions">
-                  <button type="submit" className="btn-primary"><Search size={18} /> Filtrar</button>
-                </div>
+
+                <button type="submit" className="btn-filter-submit">
+                  <Search size={16} />
+                  <span>Filtrar</span>
+                </button>
               </form>
             </div>
 
-            <div className="card results-card">
-              <div className="results-header">
+            {/* Results Table Card */}
+            <div className="card journeys-results-card">
+              <div className="journeys-results-header">
+                <div className="calendar-icon-wrapper bg-blue-50 text-blue-500">
+                  <Calendar size={20} />
+                </div>
                 <h2>Jornadas de {selectedUser.nombre_completo}</h2>
               </div>
+              
               {loading ? (
-                <div className="loading-state"><div className="spinner"></div><p>Cargando...</p></div>
-              ) : historial.length > 0 ? (
-                <div className="table-responsive">
-                  <table className="data-table">
-                    <thead>
-                      <tr>
-                        <th>Fecha</th>
-                        <th>Entrada</th>
-                        <th>Salida</th>
-                        <th>Horas</th>
-                        <th>Incidencias</th>
-                        <th>GPS</th>
-                        <th>Estado</th>
-                        <th>Asistencia</th>
-                        <th>Acción</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {historial.map((item) => (
-                        <tr key={item.id} onClick={() => handleJornadaSelect(item.id)} className="clickable-row">
-                          <td>{new Date(item.fecha + 'T00:00:00').toLocaleDateString()}</td>
-                          <td>{formatTime(item.hora_entrada)}</td>
-                          <td>{formatTime(item.hora_salida)}</td>
-                          <td><span className="duration-tag">{item.total_horas_trabajadas ? formatDuration(item.total_horas_trabajadas) : calculateDuration(item.hora_entrada, item.hora_salida)}</span></td>
-                          <td className="text-center">
-                            {item.total_incidencias > 0 ? (
-                              <span className="count-badge danger">{item.total_incidencias}</span>
-                            ) : '-'}
-                          </td>
-                          <td className="text-center">
-                            {item.total_puntos_gps > 0 ? (
-                              <span className="count-badge info">{item.total_puntos_gps}</span>
-                            ) : '-'}
-                          </td>
-                          <td>
-                            <div className="flex flex-col gap-1">
-                              <span className={`status-badge ${item.estado_puntualidad || 'pendiente'}`}>
-                                {punctualityLabels[item.estado_puntualidad || 'pendiente']}
-                              </span>
-                              {item.hora_salida && (
-                                <span className={`status-badge ${item.estado_salida || 'pendiente'}`}>
-                                  {exitStatusLabels[item.estado_salida || 'pendiente']}
-                                </span>
-                              )}
-                            </div>
-                          </td>
-                          <td><span className={`status-badge ${item.estado_asistencia}`}>{attendanceLabels[item.estado_asistencia] || item.estado_asistencia}</span></td>
-                          <td><ChevronRight size={18} /></td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <div className="loading-state">
+                  <div className="spinner"></div>
+                  <p>Cargando...</p>
                 </div>
-              ) : (
-                <div className="empty-state"><AlertCircle size={48} /><p>No hay jornadas registradas.</p></div>
+              ) : historial.length > 0 ? (() => {
+                // Client-side pagination logic
+                const indexOfLastItem = jornadasCurrentPage * jornadasPerPage;
+                const indexOfFirstItem = indexOfLastItem - jornadasPerPage;
+                const currentJornadas = historial.slice(indexOfFirstItem, indexOfLastItem);
+                const totalPages = Math.ceil(historial.length / jornadasPerPage) || 1;
+
+                // Inner helper to format short dates like 3/6/2026
+                const formatDateShort = (dateString) => {
+                  if (!dateString) return '-';
+                  try {
+                    const date = new Date(dateString + 'T00:00:00');
+                    return `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}`;
+                  } catch (e) {
+                    return dateString;
+                  }
+                };
+
+                // Inner helper to render custom Status badges with clock/check/X circles
+                const renderEstadoBadge = (estado) => {
+                  const est = (estado || 'pendiente').toLowerCase();
+                  if (est === 'pendiente') {
+                    return (
+                      <span className="table-estado-badge warning">
+                        <Clock size={12} />
+                        <span>Pendiente</span>
+                      </span>
+                    );
+                  }
+                  if (est === 'no_marco_entrada') {
+                    return (
+                      <span className="table-estado-badge danger">
+                        <XCircle size={12} />
+                        <span>No marcó entrada</span>
+                      </span>
+                    );
+                  }
+                  if (est === 'tardanza') {
+                    return (
+                      <span className="table-estado-badge danger">
+                        <Clock size={12} />
+                        <span>Tardanza (entrada)</span>
+                      </span>
+                    );
+                  }
+                  if (est === 'puntual') {
+                    return (
+                      <span className="table-estado-badge success">
+                        <CheckCircle size={12} />
+                        <span>Entrada Puntual</span>
+                      </span>
+                    );
+                  }
+                  if (est === 'temprano') {
+                    return (
+                      <span className="table-estado-badge success">
+                        <CheckCircle size={12} />
+                        <span>Entrada Anticipada</span>
+                      </span>
+                    );
+                  }
+                  return (
+                    <span className="table-estado-badge info">
+                      <span>{punctualityLabels[estado] || estado}</span>
+                    </span>
+                  );
+                };
+
+                const renderSalidaBadge = (estado) => {
+                  const est = (estado || 'pendiente').toLowerCase();
+                  if (est === 'pendiente') {
+                    return (
+                      <span className="table-estado-badge warning">
+                        <Clock size={12} />
+                        <span>Pendiente</span>
+                      </span>
+                    );
+                  }
+                  if (est === 'no_marco_salida') {
+                    return (
+                      <span className="table-estado-badge danger">
+                        <XCircle size={12} />
+                        <span>No marcó salida</span>
+                      </span>
+                    );
+                  }
+                  if (est === 'tardanza') {
+                    return (
+                      <span className="table-estado-badge danger">
+                        <Clock size={12} />
+                        <span>Salida Tardía</span>
+                      </span>
+                    );
+                  }
+                  if (est === 'puntual') {
+                    return (
+                      <span className="table-estado-badge success">
+                        <CheckCircle size={12} />
+                        <span>Salida Puntual</span>
+                      </span>
+                    );
+                  }
+                  if (est === 'temprano') {
+                    return (
+                      <span className="table-estado-badge success">
+                        <CheckCircle size={12} />
+                        <span>Salida Anticipada</span>
+                      </span>
+                    );
+                  }
+                  return (
+                    <span className="table-estado-badge info">
+                      <span>{exitStatusLabels[estado] || estado}</span>
+                    </span>
+                  );
+                };
+
+                const renderAsistenciaBadge = (estado) => {
+                  const est = (estado || '').toLowerCase();
+                  if (est === 'programada') {
+                    return (
+                      <span className="table-asistencia-badge programada">
+                        <Calendar size={12} />
+                        <span>Programada</span>
+                      </span>
+                    );
+                  }
+                  if (est === 'ausente') {
+                    return (
+                      <span className="table-asistencia-badge ausente">
+                        <User size={12} />
+                        <span>Ausente</span>
+                      </span>
+                    );
+                  }
+                  if (est === 'completa' || est === 'completada') {
+                    return (
+                      <span className="table-asistencia-badge completa">
+                        <CheckCircle size={12} />
+                        <span>Completa</span>
+                      </span>
+                    );
+                  }
+                  if (est === 'en_proceso') {
+                    return (
+                      <span className="table-asistencia-badge en-proceso">
+                        <Clock size={12} />
+                        <span>En proceso</span>
+                      </span>
+                    );
+                  }
+                  if (est === 'incompleta') {
+                    return (
+                      <span className="table-asistencia-badge incompleta">
+                        <AlertCircle size={12} />
+                        <span>Incompleta</span>
+                      </span>
+                    );
+                  }
+                  return (
+                    <span className="table-asistencia-badge info">
+                      <span>{attendanceLabels[estado] || estado}</span>
+                    </span>
+                  );
+                };
+
+                return (
+                  <>
+                    <div className="table-responsive-custom">
+                      <table className="data-table-custom">
+                        <thead>
+                          <tr>
+                            <th>Fecha</th>
+                            <th>Entrada</th>
+                            <th>Salida</th>
+                            <th>Horas</th>
+                            <th>Incidencias</th>
+                            <th>GPS</th>
+                            <th>Estado</th>
+                            <th>Asistencia</th>
+                            <th className="text-center">Acción</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {currentJornadas.map((item) => (
+                            <tr 
+                              key={item.id} 
+                              onClick={() => handleJornadaSelect(item.id)} 
+                              className="clickable-row-custom"
+                            >
+                              <td className="font-bold text-slate-800">
+                                {formatDateShort(item.fecha)}
+                              </td>
+                              <td className="text-slate-500 font-medium">
+                                {formatTime(item.hora_entrada)}
+                              </td>
+                              <td className="text-slate-500 font-medium">
+                                {formatTime(item.hora_salida)}
+                              </td>
+                              <td>
+                                {item.hora_entrada && (item.total_horas_trabajadas || item.hora_salida) ? (
+                                  <span className="duration-tag-badge">
+                                    <Clock size={12} />
+                                    <span>
+                                      {item.total_horas_trabajadas 
+                                        ? formatDuration(item.total_horas_trabajadas) 
+                                        : calculateDuration(item.hora_entrada, item.hora_salida)
+                                      }
+                                    </span>
+                                  </span>
+                                ) : (
+                                  <span className="duration-empty-badge">-</span>
+                                )}
+                              </td>
+                              <td className="text-center font-bold text-slate-500">
+                                {item.total_incidencias > 0 ? (
+                                  <span className="count-badge-incidents">{item.total_incidencias}</span>
+                                ) : '-'}
+                              </td>
+                              <td className="text-center">
+                                {item.total_puntos_gps > 0 ? (
+                                  <span className="count-badge-gps">{item.total_puntos_gps}</span>
+                                ) : '-'}
+                              </td>
+                              <td>
+                                <div className="estado-badges-stack">
+                                  {renderEstadoBadge(item.estado_puntualidad)}
+                                  {item.hora_salida && renderSalidaBadge(item.estado_salida)}
+                                </div>
+                              </td>
+                              <td>
+                                {renderAsistenciaBadge(item.estado_asistencia)}
+                              </td>
+                              <td onClick={(e) => e.stopPropagation()}>
+                                <div className="action-cell-center">
+                                  <button
+                                    className="btn-action-view"
+                                    onClick={() => handleJornadaSelect(item.id)}
+                                    title="Ver Detalle"
+                                  >
+                                    <Eye size={16} />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Table Pagination Footer */}
+                    <div className="table-pagination-footer-custom">
+                      <span className="pagination-info-text-custom">
+                        Mostrando {historial.length > 0 ? indexOfFirstItem + 1 : 0} a {Math.min(indexOfLastItem, historial.length)} de {historial.length} jornadas
+                      </span>
+                      
+                      <div className="pagination-controls-box-custom">
+                        {/* Selector for items per page */}
+                        <div className="items-per-page-select-wrapper">
+                          <select
+                            value={jornadasPerPage}
+                            onChange={(e) => {
+                              setJornadasPerPage(parseInt(e.target.value));
+                              setJornadasCurrentPage(1);
+                            }}
+                            className="items-per-page-select"
+                          >
+                            <option value={5}>5</option>
+                            <option value={10}>10</option>
+                            <option value={20}>20</option>
+                          </select>
+                        </div>
+
+                        <button
+                          className="btn-pagination-nav-custom"
+                          onClick={() => setJornadasCurrentPage(prev => Math.max(1, prev - 1))}
+                          disabled={jornadasCurrentPage === 1}
+                        >
+                          <ChevronLeft size={16} />
+                        </button>
+                        
+                        <span className="pagination-current-page-num-custom">
+                          {jornadasCurrentPage}
+                        </span>
+                        
+                        <button
+                          className="btn-pagination-nav-custom"
+                          onClick={() => setJornadasCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                          disabled={jornadasCurrentPage === totalPages}
+                        >
+                          <ChevronRight size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                );
+              })() : (
+                <div className="empty-state">
+                  <AlertCircle size={48} />
+                  <p>No hay jornadas registradas.</p>
+                </div>
               )}
             </div>
           </div>
@@ -1004,486 +1430,376 @@ const HistorialJornadas = () => {
               <div className="loading-state"><div className="spinner"></div><p>Cargando detalles...</p></div>
             ) : jornadaDetalle && (
               <>
-                <div className="detail-layout">
-                {/* Left Column: Summary & Events */}
-                <div className="detail-main">
-                  <div className="card summary-header-card">
-                    <div className="summary-info">
-                      <div className="summary-date">
-                        <Calendar size={24} />
-                        <div>
-                          <h3>{new Date(jornadaDetalle.fecha + 'T00:00:00').toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</h3>
-                          <p>{jornadaDetalle.operador} - {jornadaDetalle.sede}</p>
-                          <span className={`role-badge mini ${jornadaDetalle.rol_codigo?.toLowerCase()}`}>
-                            {jornadaDetalle.rol_nombre || '-'}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex flex-col gap-2 items-end">
-                        <span className={`status-badge large ${jornadaDetalle.estado_jornada?.toLowerCase() || 'completada'}`}>
-                          {jornadaDetalle.estado_jornada || 'Completada'}
-                        </span>
-                        <div className="flex gap-2">
-                          <span className={`status-badge ${jornadaDetalle.estado_asistencia}`}>
-                            {attendanceLabels[jornadaDetalle.estado_asistencia] || jornadaDetalle.estado_asistencia}
-                          </span>
-                          <span className={`status-badge ${jornadaDetalle.estado_puntualidad}`}>
-                            {punctualityLabels[jornadaDetalle.estado_puntualidad] || jornadaDetalle.estado_puntualidad}
-                          </span>
-                          {jornadaDetalle.hora_salida && (
-                            <span className={`status-badge ${jornadaDetalle.estado_salida}`}>
-                              {exitStatusLabels[jornadaDetalle.estado_salida] || jornadaDetalle.estado_salida}
+                <div className="detail-layout-v2">
+
+                  <div className="detail-main-v2">
+
+                    <div className="dv2-card">
+                      <div className="dv2-summary-top">
+                        <div className="dv2-date-block">
+                          <div className="dv2-cal-icon">
+                            <Calendar size={20} />
+                          </div>
+                          <div>
+                            <h3 className="dv2-date-title">
+                              {new Date(jornadaDetalle.fecha + 'T00:00:00').toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                            </h3>
+                            <div className="dv2-user-meta">
+                              <span className="dv2-user-chip"><User size={12} /> {jornadaDetalle.operador}</span>
+                              <span className="dv2-dot">·</span>
+                              <span className="dv2-sede-chip"><Building2 size={12} /> {jornadaDetalle.sede}</span>
+                            </div>
+                            <span className={`dv2-role-badge ${jornadaDetalle.rol_codigo?.toLowerCase()}`}>
+                              {jornadaDetalle.rol_nombre || '-'}
                             </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    
-                    <div className="metrics-grid">
-                      <div className="metric-item">
-                        <Clock size={20} className="text-success" />
-                        <div className="metric-val">
-                          <span>Entrada</span>
-                          <strong>{formatTime(jornadaDetalle.hora_entrada)}</strong>
-                        </div>
-                      </div>
-                      <div className="metric-item">
-                        <Clock size={20} className="text-danger" />
-                        <div className="metric-val">
-                          <span>Salida</span>
-                          <strong>{formatTime(jornadaDetalle.hora_salida)}</strong>
-                        </div>
-                      </div>
-                      <div className="metric-item">
-                        <Activity size={20} />
-                        <div className="metric-val">
-                          <span>Horas Trabajadas</span>
-                          <strong>{jornadaDetalle.total_horas_trabajadas ? formatDuration(jornadaDetalle.total_horas_trabajadas) : calculateDuration(jornadaDetalle.hora_entrada, jornadaDetalle.hora_salida)}</strong>
-                        </div>
-                      </div>
-                      <div className="metric-item">
-                        <Clock size={20} className="text-warning" />
-                        <div className="metric-val">
-                          <span>Total Descanso</span>
-                          <strong>{jornadaDetalle.total_tiempo_break ? formatDuration(jornadaDetalle.total_tiempo_break) : calculateDuration(jornadaDetalle.hora_inicio_break, jornadaDetalle.hora_fin_break)}</strong>
-                        </div>
-                      </div>
-                      <div className="metric-item">
-                        <Activity size={20} className="text-info" />
-                        <div className="metric-val">
-                          <span>Estado Asistencia</span>
-                          <strong>{attendanceLabels[jornadaDetalle.estado_asistencia] || jornadaDetalle.estado_asistencia}</strong>
-                        </div>
-                      </div>
-                      <div className="metric-item">
-                        <CheckCircle size={20} className="text-success" />
-                        <div className="metric-val">
-                          <span>Salida / Puntualidad</span>
-                          <strong>{exitStatusLabels[jornadaDetalle.estado_salida] || jornadaDetalle.estado_salida || 'Pendiente'}</strong>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="card events-timeline-card">
-                    <h2>Cronología de la Jornada (Marcaciones)</h2>
-                    <div className="timeline-v2">
-                      {jornadaDetalle.eventos?.map((evt, idx) => (
-                        <div key={idx} className="timeline-v2-item">
-                          <div className="time-col">{formatTime(evt.fecha_hora)}</div>
-                          <div className="marker-col"><div className={`marker-dot ${(evt.tipo_evento || 'info').toLowerCase()}`}></div></div>
-                          <div className="content-col">
-                            <h4>{(evt.tipo_evento || 'Evento').replace(/_/g, ' ')}</h4>
-                            {evt.distancia_sede_metros > 0 && <p className="text-sm text-muted">A {parseFloat(evt.distancia_sede_metros).toFixed(0)}m de la sede</p>}
-                            {evt.es_fuera_de_zona && <span className="warning-pill">Fuera de Zona</span>}
                           </div>
                         </div>
-                      ))}
+                        <div className="dv2-status-block">
+                          <span className="dv2-estado-label">ESTADO DE JORNADA</span>
+                          <div className="dv2-badges-row">
+                            <span className={`dv2-badge dv2-badge-asistencia ${jornadaDetalle.estado_asistencia}`}>
+                              {attendanceLabels[jornadaDetalle.estado_asistencia] || jornadaDetalle.estado_asistencia}
+                            </span>
+                            <span className={`dv2-badge dv2-badge-puntualidad ${jornadaDetalle.estado_puntualidad}`}>
+                              {punctualityLabels[jornadaDetalle.estado_puntualidad] || jornadaDetalle.estado_puntualidad}
+                            </span>
+                            {jornadaDetalle.hora_salida && (
+                              <span className={`dv2-badge dv2-badge-salida ${jornadaDetalle.estado_salida}`}>
+                                {exitStatusLabels[jornadaDetalle.estado_salida] || jornadaDetalle.estado_salida}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="dv2-metrics-row">
+                        <div className="dv2-metric">
+                          <Clock size={18} className="dv2-metric-icon entry" />
+                          <div>
+                            <span className="dv2-metric-label">ENTRADA</span>
+                            <strong className="dv2-metric-value">{formatTime(jornadaDetalle.hora_entrada)}</strong>
+                          </div>
+                        </div>
+                        <div className="dv2-metric">
+                          <Clock size={18} className="dv2-metric-icon exit" />
+                          <div>
+                            <span className="dv2-metric-label">SALIDA</span>
+                            <strong className="dv2-metric-value">{formatTime(jornadaDetalle.hora_salida)}</strong>
+                          </div>
+                        </div>
+                        <div className="dv2-metric">
+                          <Activity size={18} className="dv2-metric-icon hours" />
+                          <div>
+                            <span className="dv2-metric-label">HORAS TRABAJADAS</span>
+                            <strong className="dv2-metric-value">
+                              {jornadaDetalle.total_horas_trabajadas ? formatDuration(jornadaDetalle.total_horas_trabajadas) : calculateDuration(jornadaDetalle.hora_entrada, jornadaDetalle.hora_salida)}
+                            </strong>
+                          </div>
+                        </div>
+                        <div className="dv2-metric">
+                          <Clock size={18} className="dv2-metric-icon break" />
+                          <div>
+                            <span className="dv2-metric-label">TOTAL DESCANSO</span>
+                            <strong className="dv2-metric-value">
+                              {jornadaDetalle.total_tiempo_break ? formatDuration(jornadaDetalle.total_tiempo_break) : '-'}
+                            </strong>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="dv2-status-row">
+                        <div className="dv2-status-item">
+                          <Activity size={15} className="dv2-status-icon" />
+                          <div>
+                            <span className="dv2-status-label">ESTADO ASISTENCIA</span>
+                            <span className={`dv2-status-val asistencia-${jornadaDetalle.estado_asistencia}`}>
+                              {attendanceLabels[jornadaDetalle.estado_asistencia] || jornadaDetalle.estado_asistencia}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="dv2-status-item">
+                          <CheckCircle size={15} className="dv2-status-icon" />
+                          <div>
+                            <span className="dv2-status-label">SALIDA / PUNTUALIDAD</span>
+                            <span className={`dv2-status-val salida-${jornadaDetalle.estado_salida}`}>
+                              {exitStatusLabels[jornadaDetalle.estado_salida] || jornadaDetalle.estado_salida || 'Pendiente'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="dv2-card">
+                      <h2 className="dv2-card-title">Cronología de la Jornada (Marcaciones)</h2>
+                      <div className="dv2-timeline">
+                        {jornadaDetalle.eventos?.map((evt, idx) => (
+                          <div key={idx} className="dv2-timeline-item">
+                            <span className="dv2-tl-time">{formatTime(evt.fecha_hora)}</span>
+                            <div className="dv2-tl-track">
+                              <div className={`dv2-tl-dot ${(evt.tipo_evento || 'info').toLowerCase()}`} />
+                              {idx < (jornadaDetalle.eventos.length - 1) && <div className="dv2-tl-line" />}
+                            </div>
+                            <div className="dv2-tl-content">
+                              <strong className="dv2-tl-event-name">
+                                {(evt.tipo_evento || 'Evento').replace(/_/g, ' ').toUpperCase()}
+                              </strong>
+                              {evt.distancia_sede_metros > 0 && (
+                                <p className="dv2-tl-distance">A {parseFloat(evt.distancia_sede_metros).toFixed(0)}m de la sede</p>
+                              )}
+                              {evt.es_fuera_de_zona && (
+                                <span className="dv2-tl-zone-pill">FUERA DE ZONA</span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
 
+                  <div className="detail-side-v2">
 
-
-                  {/* El listado simple de puntos se ha reemplazado por la visualización del mapa interactivo al final de la página */}
-                </div>
-
-                {/* Right Column: Incidents & Advisor Activities */}
-                <div className="detail-side">
-                  <div className="card incidents-list-card">
-                    <h2 className="text-base font-bold text-white border-b border-slate-700/80 pb-3 mb-6 tracking-wide uppercase">
-                      {((jornadaDetalle.rol_codigo || '').toUpperCase() === 'ASESOR') ? "Incidencias y Actividades de Campo" : "Reportes e Incidencias"}
-                    </h2>
-                    
-                    {((jornadaDetalle.rol_codigo || '').toUpperCase() !== 'ASESOR') ? (
-                      /* OPERADOR ROLE */
-                      jornadaDetalle.incidencias && jornadaDetalle.incidencias.length > 0 ? (
-                        <div className="incidents-stack">
+                    <div className="dv2-card dv2-side-card">
+                      <div className="dv2-side-card-header">
+                        <div className="dv2-side-card-title-row">
+                          <AlertCircle size={16} className="dv2-side-icon" />
+                          <h2 className="dv2-card-title">Incidencias</h2>
+                        </div>
+                        <button className="dv2-kebab-btn" title="Opciones">&#x22EE;</button>
+                      </div>
+                      {jornadaDetalle.incidencias && jornadaDetalle.incidencias.length > 0 ? (
+                        <div className="dv2-incidents-list">
                           {jornadaDetalle.incidencias.map((inc, idx) => (
-                            <div key={idx} className="incident-card-v2">
-                              <div className="inc-header">
+                            <div key={idx} className="dv2-incident-item">
+                              <div className="dv2-incident-header">
                                 <strong>{inc.tipo_incidencia_0?.nombre || inc.tipo_incidencia || 'Incidencia'}</strong>
-                                <span className="inc-time">{formatTime(inc.fecha_hora_reporte)}</span>
+                                <span className="dv2-incident-time">{formatTime(inc.fecha_hora_reporte)}</span>
                               </div>
-                              <p>{inc.descripcion}</p>
-                              <div className="inc-meta-row mt-2 text-xs text-muted flex gap-2">
-                                <span><strong>Estado:</strong> {inc.estado_revision}</span>
-                              </div>
+                              <p className="dv2-incident-desc">{inc.descripcion}</p>
+                              <span className="dv2-incident-estado">{inc.estado_revision}</span>
                               {inc.foto && (
-                                <div className="inc-media">
-                                  <img 
-                                    src={inc.foto.startsWith('http') ? inc.foto : `${API_URL.replace('/api', '')}${inc.foto}`} 
-                                    alt="Evidencia" 
-                                    onClick={() => window.open(inc.foto.startsWith('http') ? inc.foto : `${API_URL.replace('/api', '')}${inc.foto}`, '_blank')} 
-                                  />
-                                </div>
+                                <img
+                                  src={inc.foto.startsWith('http') ? inc.foto : `${API_URL.replace('/api', '')}${inc.foto}`}
+                                  alt="Evidencia"
+                                  className="dv2-incident-img"
+                                  onClick={() => window.open(inc.foto.startsWith('http') ? inc.foto : `${API_URL.replace('/api', '')}${inc.foto}`, '_blank')}
+                                />
                               )}
                             </div>
                           ))}
                         </div>
                       ) : (
-                        <p className="empty-msg">No se reportaron incidencias.</p>
-                      )
-                    ) : (
-                      /* ASESOR ROLE */
-                      /* ASESOR ROLE */
-                      ((!jornadaDetalle.incidencias || jornadaDetalle.incidencias.length === 0) && 
-                       (!jornadaDetalle.actividades_campo || jornadaDetalle.actividades_campo.length === 0)) ? (
-                        <p className="empty-msg-large">
-                          No se reportaron incidencias ni actividades en esta jornada.
-                        </p>
-                      ) : (
-                        <div className="incidents-activities-stack">
-                          {/* BLOCK 1: INCIDENCIAS */}
-                          <div className="incidents-block">
-                            <h3 className="section-subtitle">Incidencias</h3>
-                            {jornadaDetalle.incidencias && jornadaDetalle.incidencias.length > 0 ? (
-                              <div className="incidents-stack">
-                                {jornadaDetalle.incidencias.map((inc, idx) => (
-                                  <div key={idx} className="incident-card-premium">
-                                    <div className="incident-card-header">
-                                      <strong className="incident-title">{inc.tipo_incidencia_0?.nombre || inc.tipo_incidencia || 'Incidencia'}</strong>
-                                      <span className="incident-time">{formatTime(inc.fecha_hora_reporte)}</span>
+                        <div className="dv2-empty-panel">
+                          <CheckCircle size={20} className="dv2-empty-icon" />
+                          <span>No se reportaron incidencias.</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {((jornadaDetalle.rol_codigo || '').toUpperCase() === 'ASESOR') && (
+                      <div className="dv2-card dv2-side-card">
+                        <div className="dv2-side-card-header">
+                          <div className="dv2-side-card-title-row">
+                            <Calendar size={16} className="dv2-side-icon activities" />
+                            <h2 className="dv2-card-title">Actividades de campo</h2>
+                          </div>
+                        </div>
+                        {jornadaDetalle.actividades_campo && jornadaDetalle.actividades_campo.length > 0 ? (
+                          <div className="dv2-activities-list">
+                            {jornadaDetalle.actividades_campo.map((act, idx) => (
+                              <div key={idx} className="dv2-activity-item">
+                                <div className="dv2-act-badges">
+                                  <span className={getActTypeClass(act.tipo_actividad)}>{act.tipo_actividad}</span>
+                                  <span className={getActStatusClass(act.estado_actividad)}>{act.estado_actividad}</span>
+                                  {act.resultado_actividad && (
+                                    <span className={getActResultClass(act.resultado_actividad)}>{act.resultado_actividad}</span>
+                                  )}
+                                </div>
+                                {act.cliente_nombre && (
+                                  <div className="dv2-act-field">
+                                    <span className="dv2-act-field-label">CLIENTE / LUGAR</span>
+                                    <span className="dv2-act-field-value bold">{act.cliente_nombre}</span>
+                                  </div>
+                                )}
+                                <div className="dv2-act-field">
+                                  <span className="dv2-act-field-label">DESCRIPCION</span>
+                                  <span className="dv2-act-field-value">{act.descripcion}</span>
+                                </div>
+                                <div className="dv2-act-times">
+                                  <div className="dv2-act-time-item">
+                                    <span className="dv2-act-field-label">INICIO</span>
+                                    <span className="dv2-act-field-value">{formatTime(act.hora_inicio_actividad)}</span>
+                                  </div>
+                                  <div className="dv2-act-time-item">
+                                    <span className="dv2-act-field-label">FIN</span>
+                                    <span className="dv2-act-field-value">{act.hora_fin_actividad ? formatTime(act.hora_fin_actividad) : '--:--'}</span>
+                                  </div>
+                                  {act.observacion && (
+                                    <div className="dv2-act-time-item dv2-act-obs">
+                                      <span className="dv2-act-field-label">OBSERVACION</span>
+                                      <span className="dv2-act-obs-val">{act.observacion}</span>
                                     </div>
-                                    <div className="incident-card-body">
-                                      <div className="incident-detail-item">
-                                        <span className="incident-detail-label">Descripción</span>
-                                        <span className="incident-detail-value">{inc.descripcion}</span>
+                                  )}
+                                </div>
+                                {(act.evidencia_inicio_url || act.evidencia_fin_url) && (
+                                  <div className="dv2-act-evidence">
+                                    {act.evidencia_inicio_url && (
+                                      <div className="dv2-evidence-item">
+                                        <span className="dv2-act-field-label">Evidencia Inicio</span>
+                                        <img
+                                          src={act.evidencia_inicio_url.startsWith('http') ? act.evidencia_inicio_url : `${API_URL.replace('/api', '')}${act.evidencia_inicio_url}`}
+                                          alt="Evidencia Inicio"
+                                          className="dv2-evidence-thumb"
+                                          onClick={() => window.open(act.evidencia_inicio_url.startsWith('http') ? act.evidencia_inicio_url : `${API_URL.replace('/api', '')}${act.evidencia_inicio_url}`, '_blank')}
+                                        />
                                       </div>
-                                      <div className="incident-detail-item inline-flex">
-                                        <span className="incident-detail-label">Estado:</span>
-                                        <span className="incident-status-badge">{inc.estado_revision}</span>
-                                      </div>
-                                    </div>
-                                    {inc.foto && (
-                                      <div className="incident-media-box">
-                                        <span className="incident-media-label">Evidencia</span>
-                                        <img 
-                                          src={inc.foto.startsWith('http') ? inc.foto : `${API_URL.replace('/api', '')}${inc.foto}`} 
-                                          alt="Evidencia" 
-                                          className="incident-media-thumb"
-                                          onClick={() => window.open(inc.foto.startsWith('http') ? inc.foto : `${API_URL.replace('/api', '')}${inc.foto}`, '_blank')} 
+                                    )}
+                                    {act.evidencia_fin_url && (
+                                      <div className="dv2-evidence-item">
+                                        <span className="dv2-act-field-label">Evidencia Fin</span>
+                                        <img
+                                          src={act.evidencia_fin_url.startsWith('http') ? act.evidencia_fin_url : `${API_URL.replace('/api', '')}${act.evidencia_fin_url}`}
+                                          alt="Evidencia Fin"
+                                          className="dv2-evidence-thumb"
+                                          onClick={() => window.open(act.evidencia_fin_url.startsWith('http') ? act.evidencia_fin_url : `${API_URL.replace('/api', '')}${act.evidencia_fin_url}`, '_blank')}
                                         />
                                       </div>
                                     )}
                                   </div>
-                                ))}
+                                )}
                               </div>
-                            ) : (
-                              <p className="empty-state-message">No se reportaron incidencias.</p>
-                            )}
+                            ))}
                           </div>
-
-                          {/* BLOCK 2: ACTIVIDADES DE CAMPO */}
-                          <div className="activities-block">
-                            <h3 className="section-subtitle">Actividades de Campo</h3>
-                            {jornadaDetalle.actividades_campo && jornadaDetalle.actividades_campo.length > 0 ? (
-                              <div className="activities-stack">
-                                {jornadaDetalle.actividades_campo.map((act, idx) => (
-                                  <div key={idx} className="activity-card-premium">
-                                    {/* HEADER: BADGES ONLY */}
-                                    <div className="activity-card-header">
-                                      <span className={getActTypeClass(act.tipo_actividad)}>{act.tipo_actividad}</span>
-                                      <span className={getActStatusClass(act.estado_actividad)}>{act.estado_actividad}</span>
-                                      {act.resultado_actividad && (
-                                        <span className={getActResultClass(act.resultado_actividad)}>{act.resultado_actividad}</span>
-                                      )}
-                                    </div>
-
-                                    {/* DETALLES DE LA ACTIVIDAD */}
-                                    <div className="activity-card-body">
-                                      {act.cliente_nombre && (
-                                        <div className="activity-detail-item">
-                                          <span className="activity-detail-label">Cliente / Lugar</span>
-                                          <span className="activity-detail-value main-highlight">{act.cliente_nombre}</span>
-                                        </div>
-                                      )}
-
-                                      <div className="activity-detail-item">
-                                        <span className="activity-detail-label">Descripción</span>
-                                        <span className="activity-detail-value description-text">{act.descripcion}</span>
-                                      </div>
-
-                                      <div className="activity-detail-item">
-                                        <span className="activity-detail-label">Inicio</span>
-                                        <span className="activity-detail-value time-value">{formatTime(act.hora_inicio_actividad)}</span>
-                                      </div>
-
-                                      <div className="activity-detail-item">
-                                        <span className="activity-detail-label">Fin</span>
-                                        <span className="activity-detail-value time-value">{act.hora_fin_actividad ? formatTime(act.hora_fin_actividad) : '--:--'}</span>
-                                      </div>
-
-                                      {act.observacion && (
-                                        <div className="activity-detail-item">
-                                          <span className="activity-detail-label">Observación</span>
-                                          <span className="activity-detail-value observation-box">{act.observacion}</span>
-                                        </div>
-                                      )}
-                                    </div>
-
-                                    {/* EVIDENCIA */}
-                                    {(act.evidencia_inicio_url || act.evidencia_fin_url) && (
-                                      <div className="activity-evidence-wrapper">
-                                        {act.evidencia_inicio_url && (
-                                          <div className="evidence-item">
-                                            <span className="evidence-label">Evidencia Inicio</span>
-                                            <img 
-                                              src={act.evidencia_inicio_url.startsWith('http') ? act.evidencia_inicio_url : `${API_URL.replace('/api', '')}${act.evidencia_inicio_url}`} 
-                                              alt="Evidencia Inicio" 
-                                              className="evidence-thumb"
-                                              onClick={() => window.open(act.evidencia_inicio_url.startsWith('http') ? act.evidencia_inicio_url : `${API_URL.replace('/api', '')}${act.evidencia_inicio_url}`, '_blank')}
-                                            />
-                                          </div>
-                                        )}
-                                        {act.evidencia_fin_url && (
-                                          <div className="evidence-item">
-                                            <span className="evidence-label">Evidencia Fin</span>
-                                            <img 
-                                              src={act.evidencia_fin_url.startsWith('http') ? act.evidencia_fin_url : `${API_URL.replace('/api', '')}${act.evidencia_fin_url}`} 
-                                              alt="Evidencia Fin" 
-                                              className="evidence-thumb"
-                                              onClick={() => window.open(act.evidencia_fin_url.startsWith('http') ? act.evidencia_fin_url : `${API_URL.replace('/api', '')}${act.evidencia_fin_url}`, '_blank')}
-                                            />
-                                          </div>
-                                        )}
-                                      </div>
-                                    )}
-                                  </div>
-                                ))}
-                              </div>
-                            ) : (
-                              <p className="empty-state-message">No se registraron actividades de campo.</p>
-                            )}
-                          </div>
-                        </div>
-                      )
+                        ) : (
+                          <p className="dv2-empty-text">No se registraron actividades de campo.</p>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>
 
-              </div>
-
-              {/* Seccion Recorrido GPS Premium */}
-              <div className="card recorrido-gps-card mt-4 animate-in">
-                <div className="card-header-flex">
-                  <h2>Recorrido GPS</h2>
-                  <div className="flex gap-2 items-center">
-                    {((trackingRecorrido?.resumen?.total_puntos !== undefined ? trackingRecorrido.resumen.total_puntos : (jornadaDetalle?.total_puntos_gps || 0)) > 0) && (
-                      <span className="badge-count">
-                        {trackingRecorrido?.resumen?.total_puntos !== undefined ? trackingRecorrido.resumen.total_puntos : jornadaDetalle.total_puntos_gps} puntos
-                      </span>
-                    )}
-                    {trackingRecorrido && (trackingRecorrido.jornada?.estado_jornada === 'en_proceso' || !trackingRecorrido.jornada?.hora_salida) && (
-                      <span className="pulse-badge-live">
-                        <span className="pulse-dot"></span>
-                        En Vivo (60s)
-                      </span>
-                    )}
-                    <button 
-                      onClick={handleLoadMap} 
-                      disabled={loadingTracking}
-                      className="btn-map-control"
-                    >
-                      {loadingTracking ? (
-                        <>
-                          <span className="map-btn-spinner"></span>
-                          Cargando...
-                        </>
-                      ) : (
-                        (!mapRequested || mapError) ? "Cargar mapa de recorrido" : "Actualizar recorrido"
+                <div className="dv2-gps-section">
+                  <div className="dv2-gps-header">
+                    <h2 className="dv2-gps-title">Recorrido GPS</h2>
+                    <div className="dv2-gps-header-right">
+                      {((trackingRecorrido?.resumen?.total_puntos !== undefined ? trackingRecorrido.resumen.total_puntos : (jornadaDetalle?.total_puntos_gps || 0)) > 0) && (
+                        <span className="dv2-gps-count-badge">
+                          {trackingRecorrido?.resumen?.total_puntos !== undefined ? trackingRecorrido.resumen.total_puntos : jornadaDetalle.total_puntos_gps} puntos
+                        </span>
                       )}
-                    </button>
+                      {trackingRecorrido && (trackingRecorrido.jornada?.estado_jornada === 'en_proceso' || !trackingRecorrido.jornada?.hora_salida) && (
+                        <span className="pulse-badge-live">
+                          <span className="pulse-dot"></span>
+                          En Vivo (60s)
+                        </span>
+                      )}
+                      <button onClick={handleLoadMap} disabled={loadingTracking} className="dv2-btn-load-map">
+                        {loadingTracking ? (
+                          <><span className="map-btn-spinner"></span> Cargando...</>
+                        ) : (
+                          (!mapRequested || mapError) ? 'Cargar mapa de recorrido' : 'Actualizar recorrido'
+                        )}
+                      </button>
+                    </div>
                   </div>
-                </div>
 
-                <div className="gps-section-layout">
-                  {/* Map Container */}
-                  <div className="google-map-wrapper">
-                    {/* Loader Overlay */}
-                    {loadingTracking && (
-                      <div className="map-loading-overlay">
-                        <div className="spinner"></div>
-                        <p className="font-semibold text-white">Cargando mapa y recorrido GPS...</p>
-                      </div>
-                    )}
-                    
-                    {/* Error Overlay */}
-                    {mapError && !loadingTracking && (
-                      <div className="map-error-overlay">
-                        <AlertCircle size={40} className="text-rose-500 mb-2" />
-                        <p className="font-semibold text-white">No se pudo cargar el mapa. Intente nuevamente.</p>
-                        <button onClick={handleLoadMap} className="btn-map-control mt-4">
-                          Intentar nuevamente
-                        </button>
-                      </div>
-                    )}
-
-                    {/* Placeholder Overlay if not requested yet */}
-                    {!mapRequested && !loadingTracking && !mapError && (
-                      <div className="map-placeholder-overlay">
-                        <MapPin size={48} className="text-emerald-500 mb-3 pulse-pin" />
-                        <p className="text-gray-300 font-semibold mb-4 text-lg">El mapa interactivo se cargará bajo demanda.</p>
-                        <button onClick={handleLoadMap} className="btn-map-control">
-                          Cargar mapa de recorrido
-                        </button>
-                      </div>
-                    )}
-
-                    {/* Empty coordinates banner if loaded but points list is empty */}
-                    {mapRequested && !loadingTracking && !mapError && trackingRecorrido && (!trackingRecorrido.puntos || trackingRecorrido.puntos.length === 0) && (
-                      <div className="map-empty-overlay">
-                        <AlertCircle size={40} className="text-amber-500 mb-2" />
-                        <p className="font-semibold text-white">No se registraron puntos GPS para esta jornada.</p>
-                      </div>
-                    )}
-
-                    {/* Google Map canvas container (rendered only when map is requested) */}
-                    {mapRequested && (
-                      <div ref={mapContainerRef} id="google-map-container" className="google-map-canvas">
-                        {!googleMapsLoaded && !mapError && (
-                          <div className="loading-state" style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1rem', background: '#0b0f19' }}>
-                            <div className="spinner"></div>
-                            <p className="text-gray-400">Cargando Google Maps...</p>
+                  <div className="dv2-gps-body">
+                    <div className="dv2-google-map-wrapper">
+                      {loadingTracking && (
+                        <div className="map-loading-overlay">
+                          <div className="spinner"></div>
+                          <p>Cargando mapa y recorrido GPS...</p>
+                        </div>
+                      )}
+                      {mapError && !loadingTracking && (
+                        <div className="map-error-overlay">
+                          <AlertCircle size={40} />
+                          <p>No se pudo cargar el mapa. Intente nuevamente.</p>
+                          <button onClick={handleLoadMap} className="dv2-btn-load-map">Intentar nuevamente</button>
+                        </div>
+                      )}
+                      {!mapRequested && !loadingTracking && !mapError && (
+                        <div className="dv2-map-placeholder">
+                          <div className="dv2-map-pin-circle">
+                            <MapPin size={40} className="dv2-map-pin-icon" />
                           </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Metrics Sidebar */}
-                  <div className="gps-metrics-sidebar">
-                    <h3>Resumen del Recorrido</h3>
-                    
-                    <div className="gps-metric-tile">
-                      <span className="tile-label">Estado de zona</span>
-                      <span className={`tile-value font-bold ${
-                        trackingRecorrido?.resumen?.ultima_ubicacion
-                          ? (trackingRecorrido.resumen.ultima_ubicacion.es_fuera_de_zona ? 'text-danger' : 'text-success')
-                          : 'text-slate-500'
-                      }`}>
-                        {trackingRecorrido?.resumen?.ultima_ubicacion
-                          ? (trackingRecorrido.resumen.ultima_ubicacion.es_fuera_de_zona ? 'FUERA DE ZONA' : 'DENTRO DE ZONA')
-                          : 'SIN CARGAR'}
-                      </span>
+                          <p className="dv2-map-placeholder-title">Mapa de recorrido no cargado</p>
+                          <p className="dv2-map-placeholder-sub">Carga el recorrido GPS para visualizar el trayecto de la jornada.</p>
+                          <button onClick={handleLoadMap} className="dv2-btn-load-map-inner">Cargar mapa de recorrido</button>
+                        </div>
+                      )}
+                      {mapRequested && !loadingTracking && !mapError && trackingRecorrido && (!trackingRecorrido.puntos || trackingRecorrido.puntos.length === 0) && (
+                        <div className="map-empty-overlay">
+                          <AlertCircle size={40} />
+                          <p>No se registraron puntos GPS para esta jornada.</p>
+                        </div>
+                      )}
+                      {mapRequested && (
+                        <div ref={mapContainerRef} id="google-map-container" className="google-map-canvas">
+                          {!googleMapsLoaded && !mapError && (
+                            <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1rem', background: '#f8fafc' }}>
+                              <div className="spinner"></div>
+                              <p style={{ color: '#64748b' }}>Cargando Google Maps...</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
 
-                    <div className="gps-metric-tile">
-                      <span className="tile-label">Distancia a la sede</span>
-                      <span className="tile-value font-semibold">
-                        {trackingRecorrido?.resumen?.ultima_ubicacion
-                          ? (trackingRecorrido.resumen.ultima_ubicacion.distancia_sede_metros !== null
-                              ? `${Math.round(trackingRecorrido.resumen.ultima_ubicacion.distancia_sede_metros)} metros`
-                              : 'No disponible')
-                          : 'SIN CARGAR'}
-                      </span>
-                    </div>
-
-                    <div className="gps-metric-tile">
-                      <span className="tile-label">Última actualización de datos</span>
-                      <span className="tile-value font-semibold text-info">
-                        {lastUpdateTime ? lastUpdateTime.toLocaleTimeString() : 'SIN CARGAR'}
-                      </span>
-                    </div>
-
-                    <div className="gps-metric-tile">
-                      <span className="tile-label">Total de puntos registrados</span>
-                      <span className="tile-value">
-                        {trackingRecorrido?.resumen?.total_puntos !== undefined
-                          ? trackingRecorrido.resumen.total_puntos
-                          : (jornadaDetalle?.total_puntos_gps || 0)}
-                      </span>
-                    </div>
-
-                    <div className="gps-metric-tile">
-                      <span className="tile-label">Puntos fuera de zona</span>
-                      <span className={`tile-value ${trackingRecorrido?.resumen?.total_fuera_de_zona > 0 ? 'text-warning font-bold' : ''}`}>
-                        {trackingRecorrido?.resumen?.total_fuera_de_zona !== undefined
-                          ? trackingRecorrido.resumen.total_fuera_de_zona
-                          : 'SIN CARGAR'}
-                      </span>
-                    </div>
-
-                    <div className="gps-metric-tile gps-tile-full">
-                      <span className="tile-label">Ubicación Sede/Local</span>
-                      <span className="tile-value subtext">
-                        <strong>{trackingRecorrido?.sede?.nombre || jornadaDetalle?.sede || 'Asignada'}</strong>
-                        {trackingRecorrido?.sede && (
-                          <span className="coordinates">
-                            (Radio: {trackingRecorrido.sede.radio_metros || 0} metros)
-                          </span>
-                        )}
-                      </span>
-                    </div>
-
-                    {trackingRecorrido?.resumen?.primera_ubicacion && (
-                      <div className="gps-metric-tile gps-tile-full">
-                        <span className="tile-label">Primera ubicación</span>
-                        <span className="tile-value subtext">
-                          <strong>{formatTime(trackingRecorrido.resumen.primera_ubicacion.fecha_hora)}</strong>
-                          <span className="coordinates">
-                            ({trackingRecorrido.resumen.primera_ubicacion.latitud.toFixed(5)}, {trackingRecorrido.resumen.primera_ubicacion.longitud.toFixed(5)})
-                          </span>
+                    <div className="dv2-gps-sidebar">
+                      <h3 className="dv2-gps-sidebar-title">Resumen del Recorrido</h3>
+                      <div className="dv2-gps-tile">
+                        <span className="dv2-gps-tile-label">ESTADO DE ZONA</span>
+                        <span className={`dv2-gps-tile-value ${trackingRecorrido?.resumen?.ultima_ubicacion ? (trackingRecorrido.resumen.ultima_ubicacion.es_fuera_de_zona ? 'danger' : 'success') : ''}`}>
+                          {trackingRecorrido?.resumen?.ultima_ubicacion ? (trackingRecorrido.resumen.ultima_ubicacion.es_fuera_de_zona ? 'FUERA DE ZONA' : 'DENTRO DE ZONA') : 'SIN CARGAR'}
                         </span>
                       </div>
-                    )}
-
-                    {trackingRecorrido?.resumen?.ultima_ubicacion && (
-                      <div className="gps-metric-tile gps-tile-full">
-                        <span className="tile-label">Última ubicación</span>
-                        <span className="tile-value subtext">
-                          <strong>{formatTime(trackingRecorrido.resumen.ultima_ubicacion.fecha_hora)}</strong>
-                          <span className="coordinates">
-                            ({trackingRecorrido.resumen.ultima_ubicacion.latitud.toFixed(5)}, {trackingRecorrido.resumen.ultima_ubicacion.longitud.toFixed(5)})
-                          </span>
+                      <div className="dv2-gps-tile">
+                        <span className="dv2-gps-tile-label">DISTANCIA A LA SEDE</span>
+                        <span className="dv2-gps-tile-value">
+                          {trackingRecorrido?.resumen?.ultima_ubicacion ? (trackingRecorrido.resumen.ultima_ubicacion.distancia_sede_metros !== null ? `${Math.round(trackingRecorrido.resumen.ultima_ubicacion.distancia_sede_metros)} metros` : 'No disponible') : 'SIN CARGAR'}
                         </span>
                       </div>
-                    )}
-
-                    {trackingRecorrido?.resumen?.ultima_ubicacion && (
-                      <div className="gps-two-column gps-tile-full">
-                        {trackingRecorrido.resumen.ultima_ubicacion.bateria_porcentaje !== null && (
-                          <div className="gps-metric-tile">
-                            <span className="tile-label">Batería última</span>
-                            <span className="tile-value font-semibold">
-                              {trackingRecorrido.resumen.ultima_ubicacion.bateria_porcentaje}%
-                            </span>
-                          </div>
-                        )}
-                        
-                        {trackingRecorrido.resumen.ultima_ubicacion.precision_metros !== null && (
-                          <div className="gps-metric-tile">
-                            <span className="tile-label">Precisión última</span>
-                            <span className="tile-value font-semibold">
-                              {Math.round(trackingRecorrido.resumen.ultima_ubicacion.precision_metros)} m
-                            </span>
-                          </div>
-                        )}
+                      <div className="dv2-gps-tile">
+                        <span className="dv2-gps-tile-label">ULTIMA ACTUALIZACION</span>
+                        <span className="dv2-gps-tile-value">{lastUpdateTime ? lastUpdateTime.toLocaleTimeString() : 'SIN CARGAR'}</span>
                       </div>
-                    )}
+                      <div className="dv2-gps-tile">
+                        <span className="dv2-gps-tile-label">TOTAL PUNTOS</span>
+                        <span className="dv2-gps-tile-value">
+                          {trackingRecorrido?.resumen?.total_puntos !== undefined ? trackingRecorrido.resumen.total_puntos : (jornadaDetalle?.total_puntos_gps || 0)}
+                        </span>
+                      </div>
+                      <div className="dv2-gps-tile">
+                        <span className="dv2-gps-tile-label">PUNTOS FUERA DE ZONA</span>
+                        <span className={`dv2-gps-tile-value ${trackingRecorrido?.resumen?.total_fuera_de_zona > 0 ? 'warning' : ''}`}>
+                          {trackingRecorrido?.resumen?.total_fuera_de_zona !== undefined ? trackingRecorrido.resumen.total_fuera_de_zona : 'SIN CARGAR'}
+                        </span>
+                      </div>
+                      <div className="dv2-gps-tile">
+                        <span className="dv2-gps-tile-label">SEDE</span>
+                        <span className="dv2-gps-tile-value">{trackingRecorrido?.sede?.nombre || jornadaDetalle?.sede || 'Asignada'}</span>
+                      </div>
+                      {trackingRecorrido?.resumen?.primera_ubicacion && (
+                        <div className="dv2-gps-tile">
+                          <span className="dv2-gps-tile-label">PRIMERA UBICACION</span>
+                          <span className="dv2-gps-tile-value">
+                            {formatTime(trackingRecorrido.resumen.primera_ubicacion.fecha_hora)}
+                            <span className="dv2-gps-coords">({trackingRecorrido.resumen.primera_ubicacion.latitud.toFixed(5)}, {trackingRecorrido.resumen.primera_ubicacion.longitud.toFixed(5)})</span>
+                          </span>
+                        </div>
+                      )}
+                      {trackingRecorrido?.resumen?.ultima_ubicacion && (
+                        <div className="dv2-gps-tile">
+                          <span className="dv2-gps-tile-label">ULTIMA UBICACION</span>
+                          <span className="dv2-gps-tile-value">
+                            {formatTime(trackingRecorrido.resumen.ultima_ubicacion.fecha_hora)}
+                            <span className="dv2-gps-coords">({trackingRecorrido.resumen.ultima_ubicacion.latitud.toFixed(5)}, {trackingRecorrido.resumen.ultima_ubicacion.longitud.toFixed(5)})</span>
+                          </span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
               </>
             )}
           </div>

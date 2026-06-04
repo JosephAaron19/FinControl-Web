@@ -1,6 +1,34 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Edit2, Trash2, User, Key, X, Search, Filter, Shield, Building, CheckCircle, MapPin } from 'lucide-react';
+import { 
+  Plus, 
+  Edit2, 
+  Trash2, 
+  User, 
+  Key, 
+  X, 
+  Search, 
+  Filter, 
+  Shield, 
+  Building, 
+  CheckCircle, 
+  MapPin,
+  Circle,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  UserPlus,
+  Lock,
+  Briefcase,
+  Phone,
+  Mail,
+  FileText,
+  Contact,
+  UserCheck,
+  XCircle,
+  Eye,
+  EyeOff
+} from 'lucide-react';
 import MainLayout from '../layouts/MainLayout';
 import { useNotification } from '../context/NotificationContext';
 import './Usuarios.css';
@@ -30,6 +58,82 @@ const Usuarios = () => {
   const [filterSede, setFilterSede] = useState('');
   const [filterRol, setFilterRol] = useState('');
   const [filterEstado, setFilterEstado] = useState('');
+
+  // Paginación
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+
+  // Control de paso activo en el formulario
+  const [activeStep, setActiveStep] = useState(1);
+
+  // Filtro de sedes autorizadas en el modal
+  const [sedeSearchQuery, setSedeSearchQuery] = useState('');
+
+  // Helper para generar iniciales
+  const getInitials = (name) => {
+    if (!name) return 'U';
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    return parts[0].substring(0, 2).toUpperCase();
+  };
+
+  // Helper para el tema del avatar
+  const getAvatarTheme = (name) => {
+    const colors = [
+      { bg: '#e0f2fe', text: '#0284c7' }, // Blue/Sky
+      { bg: '#dcfce7', text: '#15803d' }, // Green
+      { bg: '#ecfeff', text: '#0891b2' }, // Cyan
+      { bg: '#f3e8ff', text: '#7e22ce' }, // Purple
+      { bg: '#fce7f3', text: '#be185d' }, // Pink
+      { bg: '#ffe4e6', text: '#be123c' }  // Red/Rose
+    ];
+    let sum = 0;
+    if (name) {
+      sum = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    }
+    return colors[sum % colors.length];
+  };
+
+  const scrollToSection = (id, stepNumber) => {
+    if (stepNumber !== undefined) {
+      setActiveStep(stepNumber);
+    }
+    const el = document.getElementById(id);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  };
+
+  const handleModalScroll = (e) => {
+    const container = e.target;
+    const containerRect = container.getBoundingClientRect();
+    
+    const sections = [
+      { id: 'section-acceso', step: 1 },
+      { id: 'section-perfil', step: 2 },
+      { id: 'section-asignacion', step: 3 },
+      { id: 'section-estado', step: 4 }
+    ];
+    
+    let currentStep = 1;
+    let minDiff = Infinity;
+    
+    sections.forEach(sec => {
+      const el = document.getElementById(sec.id);
+      if (el) {
+        const rect = el.getBoundingClientRect();
+        const diff = Math.abs(rect.top - containerRect.top);
+        if (diff < minDiff) {
+          minDiff = diff;
+          currentStep = sec.step;
+        }
+      }
+    });
+    
+    setActiveStep(currentStep);
+  };
 
   // Formulario Principal
   const [formData, setFormData] = useState({
@@ -68,7 +172,15 @@ const Usuarios = () => {
       });
       if (resUsers.ok) {
         const data = await resUsers.json();
-        setUsuarios(data);
+        // Filtrar el administrador de sistema para que no sea visible en la interfaz
+        const filteredData = data.filter(u => {
+          const isSystemAdmin = 
+            u.nombre_completo?.toLowerCase() === 'administrador sistema' || 
+            u.dni === '87654321' || 
+            u.username?.toLowerCase() === 'admin';
+          return !isSystemAdmin;
+        });
+        setUsuarios(filteredData);
       }
 
       // Fetch Sedes
@@ -119,6 +231,8 @@ const Usuarios = () => {
   }, [navigate]);
 
   const handleOpenModal = (usuario = null) => {
+    setActiveStep(1);
+    setSedeSearchQuery('');
     if (usuario) {
       setCurrentUsuario(usuario);
       setFormData({
@@ -349,36 +463,122 @@ const Usuarios = () => {
     return matchesSearch && matchesSede && matchesRol && matchesEstado;
   });
 
+  // Cálculos de Paginación
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentUsuariosList = filteredUsuarios.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredUsuarios.length / itemsPerPage) || 1;
+
+  // Variables para la selección de sedes autorizadas
+  const selectedRoleName = roles.find(r => r.id == formData.rol)?.nombre?.toLowerCase() || '';
+  const showSedesSelection = selectedRoleName.includes('gerente') || selectedRoleName.includes('supervisor') || selectedRoleName.includes('admin') || selectedRoleName.includes('administrador');
+  
+  const filteredSedesForSelection = sedes.filter(sede =>
+    sede.nombre?.toLowerCase().includes(sedeSearchQuery.toLowerCase())
+  );
+
   return (
     <MainLayout 
       title="Gestión de Usuarios" 
       subtitle="Administra los accesos, roles y sedes de los trabajadores."
     >
-      <div className="usuarios-container card">
+      <div className="flex flex-col gap-6 w-full animate-in select-none">
         
-        {/* Barra de Filtros en Dos Filas */}
-        <div className="filters-container">
-          <div className="filters-top-row">
+        {/* Fila de KPIs Superiores */}
+        <div className="users-kpi-grid">
+          {/* Card 1: Total Usuarios */}
+          <div className="users-kpi-card">
+            <div className="users-kpi-icon bg-sky-50 text-sky-500">
+              <User className="w-5 h-5" />
+            </div>
+            <div className="users-kpi-text">
+              <span className="users-kpi-title">Total Usuarios</span>
+              <span className="users-kpi-value">{usuarios.length}</span>
+              <span className="users-kpi-subtext">Usuarios registrados</span>
+            </div>
+          </div>
+
+          {/* Card 2: Operadores */}
+          <div className="users-kpi-card">
+            <div className="users-kpi-icon bg-emerald-50 text-emerald-500">
+              <User className="w-5 h-5" />
+            </div>
+            <div className="users-kpi-text">
+              <span className="users-kpi-title">Operadores</span>
+              <span className="users-kpi-value">
+                {usuarios.filter(u => (u.rol_info?.nombre || '').toLowerCase().includes('operador') || (u.rol_info?.codigo || '').toLowerCase().includes('operador')).length}
+              </span>
+              <span className="users-kpi-subtext">Cuentas con rol operador</span>
+            </div>
+          </div>
+
+          {/* Card 3: Asesores */}
+          <div className="users-kpi-card">
+            <div className="users-kpi-icon bg-purple-50 text-purple-500">
+              <User className="w-5 h-5" />
+            </div>
+            <div className="users-kpi-text">
+              <span className="users-kpi-title">Asesores</span>
+              <span className="users-kpi-value">
+                {usuarios.filter(u => (u.rol_info?.nombre || '').toLowerCase().includes('asesor') || (u.rol_info?.codigo || '').toLowerCase().includes('asesor')).length}
+              </span>
+              <span className="users-kpi-subtext">Cuentas con rol asesor</span>
+            </div>
+          </div>
+
+          {/* Card 4: Administradores */}
+          <div className="users-kpi-card">
+            <div className="users-kpi-icon bg-rose-50 text-rose-500">
+              <Shield className="w-5 h-5" />
+            </div>
+            <div className="users-kpi-text">
+              <span className="users-kpi-title">Administradores</span>
+              <span className="users-kpi-value">
+                {usuarios.filter(u => (u.rol_info?.nombre || '').toLowerCase().includes('admin') || (u.rol_info?.codigo || '').toLowerCase().includes('admin')).length}
+              </span>
+              <span className="users-kpi-subtext">Cuentas con rol admin</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Contenedor Principal de la Tabla */}
+        <div className="usuarios-container card">
+          
+          {/* Barra de Filtros Unificada */}
+          <div className="filters-bar">
+            {/* Buscador */}
             <div className="search-group">
               <Search size={18} className="search-icon" />
               <input 
                 type="text" 
                 placeholder="Buscar por nombre, DNI, cargo o correo..." 
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setCurrentPage(1);
+                }}
                 className="input-field search-input"
               />
             </div>
-            <button className="btn btn-primary btn-add-user" onClick={() => handleOpenModal()}>
-              <Plus size={20} />
-              <span>Nuevo Usuario</span>
-            </button>
-          </div>
-          
-          <div className="filters-bottom-row">
-            <div className="filter-select-wrapper">
-              <Building size={16} className="select-icon" />
-              <select value={filterSede} onChange={(e) => setFilterSede(e.target.value)} className="input-field filter-select">
+
+            {/* Selector Sede */}
+            <div className="filter-select-card">
+              <MapPin size={16} className="filter-card-icon" />
+              <div className="filter-card-text">
+                <span className="filter-card-label">Sede</span>
+                <span className="filter-card-value">
+                  {sedes.find(s => s.id === parseInt(filterSede))?.nombre || 'Todas las sedes'}
+                </span>
+              </div>
+              <ChevronDown size={14} className="filter-card-chevron" />
+              <select 
+                value={filterSede} 
+                onChange={(e) => {
+                  setFilterSede(e.target.value);
+                  setCurrentPage(1);
+                }} 
+                className="filter-select-overlay"
+              >
                 <option value="">Todas las Sedes</option>
                 {sedes.map(sede => (
                   <option key={sede.id} value={sede.id}>{sede.nombre}</option>
@@ -386,9 +586,24 @@ const Usuarios = () => {
               </select>
             </div>
 
-            <div className="filter-select-wrapper">
-              <Shield size={16} className="select-icon" />
-              <select value={filterRol} onChange={(e) => setFilterRol(e.target.value)} className="input-field filter-select">
+            {/* Selector Rol */}
+            <div className="filter-select-card">
+              <User size={16} className="filter-card-icon" />
+              <div className="filter-card-text">
+                <span className="filter-card-label">Rol</span>
+                <span className="filter-card-value">
+                  {roles.find(r => r.id === parseInt(filterRol))?.nombre || 'Todos los roles'}
+                </span>
+              </div>
+              <ChevronDown size={14} className="filter-card-chevron" />
+              <select 
+                value={filterRol} 
+                onChange={(e) => {
+                  setFilterRol(e.target.value);
+                  setCurrentPage(1);
+                }} 
+                className="filter-select-overlay"
+              >
                 <option value="">Todos los Roles</option>
                 {roles.map(rol => (
                   <option key={rol.id} value={rol.id}>{rol.nombre}</option>
@@ -396,89 +611,166 @@ const Usuarios = () => {
               </select>
             </div>
 
-            <div className="filter-select-wrapper">
-              <Filter size={16} className="select-icon" />
-              <select value={filterEstado} onChange={(e) => setFilterEstado(e.target.value)} className="input-field filter-select">
+            {/* Selector Estado */}
+            <div className="filter-select-card">
+              <Circle size={16} className="filter-card-icon" />
+              <div className="filter-card-text">
+                <span className="filter-card-label">Estado</span>
+                <span className="filter-card-value">
+                  {filterEstado === 'true' ? 'Activos' : filterEstado === 'false' ? 'Inactivos' : 'Todos los estados'}
+                </span>
+              </div>
+              <ChevronDown size={14} className="filter-card-chevron" />
+              <select 
+                value={filterEstado} 
+                onChange={(e) => {
+                  setFilterEstado(e.target.value);
+                  setCurrentPage(1);
+                }} 
+                className="filter-select-overlay"
+              >
                 <option value="">Todos los Estados</option>
                 <option value="true">Activos</option>
                 <option value="false">Inactivos</option>
               </select>
             </div>
+
+            {/* Botón Nuevo Usuario */}
+            <button className="btn-add-user" onClick={() => handleOpenModal()} type="button">
+              <Plus size={16} />
+              <span>Nuevo Usuario</span>
+            </button>
           </div>
+
+          {/* Tabla o Estado de Carga */}
+          {loading ? (
+            <div className="loading-state">Cargando usuarios...</div>
+          ) : filteredUsuarios.length === 0 ? (
+            <div className="empty-state">
+              <User size={48} className="empty-icon" />
+              <p>No se encontraron usuarios con los filtros aplicados.</p>
+            </div>
+          ) : (
+            <>
+              <div className="table-responsive">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Usuario / DNI</th>
+                      <th>Nombre Completo</th>
+                      <th>Cargo</th>
+                      <th>Sede</th>
+                      <th>Rol</th>
+                      <th>Estado</th>
+                      <th style={{ textAlign: 'center' }}>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {currentUsuariosList.map(user => (
+                      <tr key={user.id}>
+                        <td>
+                          <div className="user-profile-cell">
+                            <div 
+                              className="user-avatar-circle"
+                              style={{
+                                backgroundColor: getAvatarTheme(user.nombre_completo).bg,
+                                color: getAvatarTheme(user.nombre_completo).text
+                              }}
+                            >
+                              {getInitials(user.nombre_completo)}
+                            </div>
+                            <div className="user-profile-text">
+                              <span className="user-dni-value">{user.dni}</span>
+                              <span className="user-username-value">{user.username || '—'}</span>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="user-name-cell">{user.nombre_completo}</td>
+                        <td className="user-cargo-cell">{user.cargo || '—'}</td>
+                        <td className="user-sede-cell">{user.sede_info?.nombre || '—'}</td>
+                        <td>
+                          <span className={`role-badge-pill ${user.rol_info?.codigo?.toLowerCase()}`}>
+                            {user.rol_info?.nombre || '—'}
+                          </span>
+                        </td>
+                        <td>
+                          <span className={`status-badge-pill ${user.activo ? 'active' : 'inactive'}`}>
+                            {user.activo ? 'ACTIVO' : 'INACTIVO'}
+                          </span>
+                        </td>
+                        <td>
+                          <div className="action-buttons-cell">
+                            <button 
+                              className="btn-action-edit" 
+                              onClick={() => handleOpenModal(user)}
+                              title="Editar"
+                              type="button"
+                            >
+                              <Edit2 size={16} />
+                            </button>
+                            <button 
+                              className="btn-action-key" 
+                              onClick={() => handleOpenPasswordModal(user)}
+                              title="Cambiar Contraseña"
+                              type="button"
+                            >
+                              <Key size={16} />
+                            </button>
+                            <button 
+                              className={`btn-action-status ${user.activo ? 'active' : 'inactive'}`}
+                              onClick={() => handleToggleActive(user)}
+                              title={user.activo ? 'Desactivar' : 'Activar'}
+                              type="button"
+                            >
+                              <User size={16} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Table pagination footer */}
+              <div className="table-pagination-footer">
+                <span className="pagination-legend">
+                  Mostrando {indexOfFirstItem + 1} a {Math.min(indexOfLastItem, filteredUsuarios.length)} de {filteredUsuarios.length} usuarios
+                </span>
+
+                <div className="pagination-buttons">
+                  <button
+                    className="btn-page-arrow"
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                    type="button"
+                  >
+                    <ChevronLeft size={14} />
+                  </button>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                    <button
+                      key={page}
+                      className={`btn-page-number ${currentPage === page ? 'active' : ''}`}
+                      onClick={() => setCurrentPage(page)}
+                      type="button"
+                    >
+                      {page}
+                    </button>
+                  ))}
+                  <button
+                    className="btn-page-arrow"
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    disabled={currentPage === totalPages}
+                    type="button"
+                  >
+                    <ChevronRight size={14} />
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
         </div>
 
-        {/* Tabla o Estado de Carga */}
-        {loading ? (
-          <div className="loading-state">Cargando usuarios...</div>
-        ) : filteredUsuarios.length === 0 ? (
-          <div className="empty-state">
-            <User size={48} className="empty-icon" />
-            <p>No se encontraron usuarios con los filtros aplicados.</p>
-          </div>
-        ) : (
-          <div className="table-responsive">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Usuario / DNI</th>
-                  <th>Nombre Completo</th>
-                  <th>Cargo</th>
-                  <th>Sede</th>
-                  <th>Rol</th>
-                  <th>Estado</th>
-                  <th>Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredUsuarios.map(user => (
-                  <tr key={user.id}>
-                    <td>
-                      <div className="font-semibold">{user.dni}</div>
-                    </td>
-                    <td>{user.nombre_completo}</td>
-                    <td>{user.cargo || '-'}</td>
-                    <td>{user.sede_info?.nombre || '-'}</td>
-                    <td>
-                      <span className={`role-badge ${user.rol_info?.codigo?.toLowerCase()}`}>
-                        {user.rol_info?.nombre || '-'}
-                      </span>
-                    </td>
-                    <td>
-                      <span className={`status-badge ${user.activo ? 'valid' : 'invalid'}`}>
-                        {user.activo ? 'Activo' : 'Inactivo'}
-                      </span>
-                    </td>
-                    <td>
-                      <div className="action-buttons">
-                        <button 
-                          className="btn-icon text-primary" 
-                          onClick={() => handleOpenModal(user)}
-                          title="Editar"
-                        >
-                          <Edit2 size={18} />
-                        </button>
-                        <button 
-                          className="btn-icon text-warning" 
-                          onClick={() => handleOpenPasswordModal(user)}
-                          title="Cambiar Contraseña"
-                        >
-                          <Key size={18} />
-                        </button>
-                        <button 
-                          className={`btn-icon ${user.activo ? 'text-danger' : 'text-success'}`}
-                          onClick={() => handleToggleActive(user)}
-                          title={user.activo ? 'Desactivar' : 'Activar'}
-                        >
-                          <User size={18} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
       </div>
 
       {/* Modal Principal (Crear/Editar) */}
@@ -486,51 +778,114 @@ const Usuarios = () => {
         <div className="modal-overlay">
           <div className="modal-content modal-large">
             <div className="modal-header">
-              <h2>{currentUsuario ? 'Editar Usuario' : 'Nuevo Usuario'}</h2>
-              <button className="btn-icon" onClick={handleCloseModal}>
-                <X size={24} />
+              <div className="modal-header-left">
+                <div className="modal-header-icon">
+                  <UserPlus className="w-5 h-5" />
+                </div>
+                <div className="modal-header-text">
+                  <h2>{currentUsuario ? 'Editar Usuario' : 'Nuevo Usuario'}</h2>
+                  <p>Registra un nuevo trabajador y configura su acceso al sistema.</p>
+                </div>
+              </div>
+              <button className="btn-icon modal-close-btn" onClick={handleCloseModal} type="button">
+                <X size={20} />
               </button>
+            </div>
+
+            {/* Step navigation indicator */}
+            <div className="modal-steps-indicator">
+              <div className={`step-item ${activeStep === 1 ? 'active' : ''}`} onClick={() => scrollToSection('section-acceso', 1)}>
+                <div className="step-number">1</div>
+                <div className="step-label">
+                  <span className="step-title">Acceso</span>
+                  <span className="step-desc">Credenciales</span>
+                </div>
+              </div>
+              <div className="step-connector"></div>
+              <div className={`step-item ${activeStep === 2 ? 'active' : ''}`} onClick={() => scrollToSection('section-perfil', 2)}>
+                <div className="step-number">2</div>
+                <div className="step-label">
+                  <span className="step-title">Perfil</span>
+                  <span className="step-desc">Información personal</span>
+                </div>
+              </div>
+              <div className="step-connector"></div>
+              <div className={`step-item ${activeStep === 3 ? 'active' : ''}`} onClick={() => scrollToSection('section-asignacion', 3)}>
+                <div className="step-number">3</div>
+                <div className="step-label">
+                  <span className="step-title">Asignación</span>
+                  <span className="step-desc">Rol y sede</span>
+                </div>
+              </div>
+              <div className="step-connector"></div>
+              <div className={`step-item ${activeStep === 4 ? 'active' : ''}`} onClick={() => scrollToSection('section-estado', 4)}>
+                <div className="step-number">4</div>
+                <div className="step-label">
+                  <span className="step-title">Estado</span>
+                  <span className="step-desc">Observaciones</span>
+                </div>
+              </div>
             </div>
             
             <form onSubmit={handleSubmit} className="modal-form">
-              <div className="modal-body">
+              <div className="modal-body user-modal-body" onScroll={handleModalScroll}>
                 
                 {/* Sección 1: Datos de acceso */}
-                <div className="form-section">
-                  <h3 className="section-title">
-                    <span className="section-title-icon">🔑</span> Datos de acceso
-                  </h3>
+                <div className="form-section-card" id="section-acceso">
+                  <div className="form-section-card-header">
+                    <div className="form-section-card-icon-box bg-blue-50 text-blue-500">
+                      <Lock className="w-5 h-5" />
+                    </div>
+                    <div className="form-section-card-header-text">
+                      <h3>Datos de acceso</h3>
+                      <p>Credenciales de acceso al sistema.</p>
+                    </div>
+                  </div>
+                  
                   <div className="form-grid-2">
                     <div className={`form-group ${currentUsuario ? 'full-width' : ''}`}>
-                      <label>DNI (Username) *</label>
-                      <input 
-                        type="text" 
-                        name="dni"
-                        value={formData.dni} 
-                        onChange={handleInputChange} 
-                        required 
-                        disabled={!!currentUsuario}
-                        className="input-field"
-                        placeholder="Ej. 12345678"
-                        maxLength={8}
-                      />
+                      <label>DNI (Username) <span className="text-rose-500">*</span></label>
+                      <div className="relative input-wrapper">
+                        <Contact className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                        <input 
+                          type="text" 
+                          name="dni"
+                          value={formData.dni} 
+                          onChange={handleInputChange} 
+                          required 
+                          disabled={!!currentUsuario}
+                          className="input-field pl-9"
+                          placeholder="12345678"
+                          maxLength={8}
+                        />
+                      </div>
                     </div>
                     {!currentUsuario && (
                       <div className="form-group">
-                        <label>Contraseña Temporal *</label>
-                        <div className="password-input-wrapper">
-                          <input 
-                            type={showPassword ? "text" : "password"} 
-                            name="password"
-                            value={formData.password} 
-                            onChange={handleInputChange} 
-                            required={!currentUsuario}
-                            className="input-field"
-                            placeholder="Asigna una contraseña inicial"
-                          />
+                        <label>Contraseña temporal <span className="text-rose-500">*</span></label>
+                        <div className="password-input-row">
+                          <div className="relative password-field-wrapper flex-1">
+                            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                            <input 
+                              type={showPassword ? "text" : "password"} 
+                              name="password"
+                              value={formData.password} 
+                              onChange={handleInputChange} 
+                              required={!currentUsuario}
+                              className="input-field pl-9 pr-9"
+                              placeholder="••••••••••••"
+                            />
+                            <button 
+                              type="button" 
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
+                              onClick={() => setShowPassword(!showPassword)}
+                            >
+                              {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                            </button>
+                          </div>
                           <button 
                             type="button" 
-                            className="password-toggle-btn"
+                            className="btn-password-toggle-text"
                             onClick={() => setShowPassword(!showPassword)}
                           >
                             {showPassword ? 'Ocultar' : 'Ver'}
@@ -542,126 +897,215 @@ const Usuarios = () => {
                 </div>
 
                 {/* Sección 2: Datos personales */}
-                <div className="form-section">
-                  <h3 className="section-title">
-                    <span className="section-title-icon">👤</span> Datos personales
-                  </h3>
+                <div className="form-section-card" id="section-perfil">
+                  <div className="form-section-card-header">
+                    <div className="form-section-card-icon-box bg-blue-50 text-blue-500">
+                      <User className="w-5 h-5" />
+                    </div>
+                    <div className="form-section-card-header-text">
+                      <h3>Datos personales</h3>
+                      <p>Información personal del usuario.</p>
+                    </div>
+                  </div>
+                  
                   <div className="form-grid-2">
                     <div className="form-group full-width">
-                      <label>Nombre Completo *</label>
-                      <input 
-                        type="text" 
-                        name="nombre_completo"
-                        value={formData.nombre_completo} 
-                        onChange={handleInputChange} 
-                        required 
-                        className="input-field"
-                        placeholder="Ej. Juan Pérez"
-                      />
+                      <label>Nombre completo <span className="text-rose-500">*</span></label>
+                      <div className="relative input-wrapper">
+                        <User className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                        <input 
+                          type="text" 
+                          name="nombre_completo"
+                          value={formData.nombre_completo} 
+                          onChange={handleInputChange} 
+                          required 
+                          className="input-field pl-9"
+                          placeholder="Juan Pérez"
+                        />
+                      </div>
                     </div>
                     <div className="form-group">
                       <label>Cargo</label>
-                      <input 
-                        type="text" 
-                        name="cargo"
-                        value={formData.cargo} 
-                        onChange={handleInputChange} 
-                        className="input-field"
-                        placeholder="Ej. Supervisor"
-                      />
+                      <div className="relative input-wrapper">
+                        <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                        <input 
+                          type="text" 
+                          name="cargo"
+                          value={formData.cargo} 
+                          onChange={handleInputChange} 
+                          className="input-field pl-9"
+                          placeholder="Supervisor"
+                        />
+                      </div>
                     </div>
                     <div className="form-group">
                       <label>Celular</label>
-                      <input 
-                        type="text" 
-                        name="telefono"
-                        value={formData.telefono} 
-                        onChange={handleInputChange} 
-                        className="input-field"
-                        placeholder="Ej. 987654321"
-                        maxLength={9}
-                      />
+                      <div className="relative input-wrapper">
+                        <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                        <input 
+                          type="text" 
+                          name="telefono"
+                          value={formData.telefono} 
+                          onChange={handleInputChange} 
+                          className="input-field pl-9"
+                          placeholder="987654321"
+                          maxLength={9}
+                        />
+                      </div>
                     </div>
                     <div className="form-group full-width">
-                      <label>Correo Electrónico</label>
-                      <input 
-                        type="email" 
-                        name="email"
-                        value={formData.email} 
-                        onChange={handleInputChange} 
-                        className="input-field"
-                        placeholder="Ej. correo@dominio.com"
-                      />
+                      <label>Correo electrónico</label>
+                      <div className="relative input-wrapper">
+                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                        <input 
+                          type="email" 
+                          name="email"
+                          value={formData.email} 
+                          onChange={handleInputChange} 
+                          className="input-field pl-9"
+                          placeholder="correo@dominio.com"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
 
                 {/* Sección 3: Asignación del sistema */}
-                <div className="form-section">
-                  <h3 className="section-title">
-                    <span className="section-title-icon">⚙️</span> Asignación del sistema
-                  </h3>
+                <div className="form-section-card" id="section-asignacion">
+                  <div className="form-section-card-header">
+                    <div className="form-section-card-icon-box bg-blue-50 text-blue-500">
+                      <Shield className="w-5 h-5" />
+                    </div>
+                    <div className="form-section-card-header-text">
+                      <h3>Asignación del sistema</h3>
+                      <p>Configura los permisos y la sede principal del usuario.</p>
+                    </div>
+                  </div>
+                  
                   <div className="form-grid-2">
                     <div className="form-group">
-                      <label>Rol *</label>
-                      <select name="rol" value={formData.rol} onChange={handleInputChange} required className="input-field">
-                        <option value="">Seleccione un Rol</option>
-                        {roles
-                          .filter(rol => {
-                            const userRole = userProfile?.rol_info?.codigo?.toUpperCase() || userProfile?.rol_info?.nombre?.toUpperCase() || '';
-                            if (userRole.includes('ADMIN') || userRole === 'SUPERADMIN') return true;
-                            if (userRole.includes('GERENTE') || userRole.includes('SUPERVISOR')) {
-                              const targetRol = (rol.codigo || rol.nombre || '').toUpperCase();
-                              return ['OPERADOR', 'ASESOR'].includes(targetRol);
-                            }
-                            return false;
-                          })
-                          .map(rol => (
-                            <option key={rol.id} value={rol.id}>{rol.nombre}</option>
-                          ))}
-                      </select>
+                      <label>Rol <span className="text-rose-500">*</span></label>
+                      <div className="relative select-wrapper">
+                        <Shield className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none" />
+                        <select name="rol" value={formData.rol} onChange={handleInputChange} required autoComplete="off" className={`input-field pl-9 select-field ${!formData.rol ? 'text-slate-400' : 'text-slate-800'}`}>
+                          <option value="">Seleccione un Rol</option>
+                          {roles
+                            .filter(rol => {
+                              const userRole = userProfile?.rol_info?.codigo?.toUpperCase() || userProfile?.rol_info?.nombre?.toUpperCase() || '';
+                              if (userRole.includes('ADMIN') || userRole === 'SUPERADMIN') return true;
+                              if (userRole.includes('GERENTE') || userRole.includes('SUPERVISOR')) {
+                                const targetRol = (rol.codigo || rol.nombre || '').toUpperCase();
+                                return ['OPERADOR', 'ASESOR'].includes(targetRol);
+                              }
+                              return false;
+                            })
+                            .map(rol => (
+                              <option key={rol.id} value={rol.id}>{rol.nombre}</option>
+                            ))}
+                        </select>
+                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none" />
+                      </div>
                     </div>
                     <div className="form-group">
-                      <label>Sede Principal *</label>
-                      <select name="sede" value={formData.sede} onChange={handleInputChange} required className="input-field">
-                        <option value="">Seleccione una Sede</option>
-                        {sedes.map(sede => (
-                          <option key={sede.id} value={sede.id}>{sede.nombre}</option>
-                        ))}
-                      </select>
+                      <label>Sede principal <span className="text-rose-500">*</span></label>
+                      <div className="relative select-wrapper">
+                        <Building className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none" />
+                        <select name="sede" value={formData.sede} onChange={handleInputChange} required autoComplete="off" className={`input-field pl-9 select-field ${!formData.sede ? 'text-slate-400' : 'text-slate-800'}`}>
+                          <option value="">Seleccione una Sede</option>
+                          {sedes.map(sede => (
+                            <option key={sede.id} value={sede.id}>{sede.nombre}</option>
+                          ))}
+                        </select>
+                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none" />
+                      </div>
                     </div>
                     
-                    {/* Selector Dinámico para Gerentes */}
-                    {roles.find(r => r.id == formData.rol)?.nombre?.toLowerCase().includes('gerente') && (
+                    {/* Selector Dinámico para Gerentes/Supervisores/Administradores */}
+                    {showSedesSelection && (
                       <div className="form-group full-width">
-                        <label>Sedes Autorizadas (Multiselección) *</label>
                         <div className="sede-selection-container">
                           <div className="selection-header-info">
-                            <h4>Selecciona las sedes adicionales</h4>
+                            <div className="selection-header-left">
+                              <h4>Sedes autorizadas</h4>
+                              <p>
+                                El {selectedRoleName.includes('gerente') ? 'gerente' : selectedRoleName.includes('supervisor') ? 'supervisor' : 'administrador'} podrá supervisar y gestionar múltiples sedes.
+                              </p>
+                            </div>
                             <span className="badge-count">
-                              {(formData.sedes_ids || []).length} seleccionadas
+                              {((formData.sedes_ids || []).includes(parseInt(formData.sede)) ? (formData.sedes_ids || []).length : ((formData.sedes_ids || []).length + (formData.sede ? 1 : 0)))} seleccionadas
                             </span>
                           </div>
                           
-                          <div className="sede-chips-grid">
-                            {sedes.map(sede => {
+                          <div className="sede-search-wrapper">
+                            <Search className="sede-search-icon" size={16} />
+                            <input 
+                              type="text"
+                              placeholder="Buscar sede..."
+                              value={sedeSearchQuery}
+                              onChange={(e) => setSedeSearchQuery(e.target.value)}
+                              className="sede-search-input"
+                              autoComplete="off"
+                            />
+                          </div>
+
+                          <div className="sede-cards-grid">
+                            {filteredSedesForSelection.map(sede => {
                               const isCentral = parseInt(formData.sede) === sede.id;
                               const isSelected = (formData.sedes_ids || []).includes(sede.id) || isCentral;
                               
                               return (
                                 <div 
                                   key={sede.id} 
-                                  className={`sede-chip-item ${isSelected ? 'selected' : ''} ${isCentral ? 'is_central' : ''}`}
+                                  className={`sede-card-item ${isSelected ? 'selected' : ''} ${isCentral ? 'is_central' : ''}`}
                                   onClick={() => !isCentral && toggleSede(sede.id)}
                                 >
-                                  {isCentral && <span className="central-badge">Central</span>}
-                                  <div className="chip-icon-wrapper">
-                                    <MapPin size={16} />
+                                  <div className="sede-card-left">
+                                    <MapPin size={18} className="sede-pin-icon" />
+                                    <span className="sede-card-name">
+                                      {isCentral ? `Central - ${sede.nombre}` : sede.nombre}
+                                    </span>
                                   </div>
-                                  <span className="sede-chip-name">{sede.nombre}</span>
+                                  <div className="sede-card-right">
+                                    {isSelected ? (
+                                      <CheckCircle className="check-icon checked" size={18} />
+                                    ) : (
+                                      <div className="check-icon unchecked" />
+                                    )}
+                                  </div>
                                 </div>
                               );
                             })}
+                          </div>
+
+                          <div className="selected-sedes-chips-footer">
+                            <span className="selected-label">Seleccionadas</span>
+                            <div className="selected-chips-list">
+                              {formData.sede && (() => {
+                                const centralSede = sedes.find(s => s.id === parseInt(formData.sede));
+                                if (centralSede) {
+                                  return (
+                                    <div className="selected-sede-chip central">
+                                      <span>Central - {centralSede.nombre}</span>
+                                    </div>
+                                  );
+                                }
+                                return null;
+                              })()}
+                              {sedes
+                                .filter(s => (formData.sedes_ids || []).includes(s.id) && s.id !== parseInt(formData.sede))
+                                .map(s => (
+                                  <div key={s.id} className="selected-sede-chip">
+                                    <span>{s.nombre}</span>
+                                    <button 
+                                      type="button" 
+                                      className="remove-chip-btn"
+                                      onClick={() => toggleSede(s.id)}
+                                    >
+                                      <X size={12} />
+                                    </button>
+                                  </div>
+                                ))}
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -669,48 +1113,64 @@ const Usuarios = () => {
                   </div>
                 </div>
 
-                {/* Sección 4: Observación y Estados */}
-                <div className="form-section" style={{ marginBottom: 0 }}>
-                  <h3 className="section-title">
-                    <span className="section-title-icon">📝</span> Observación y Estados
-                  </h3>
-                  <div className="form-grid-2">
-                    <div className="form-group full-width">
+                {/* Sección 4: Observación y estado */}
+                <div className="form-section-card" id="section-estado">
+                  <div className="form-section-card-header">
+                    <div className="form-section-card-icon-box bg-blue-50 text-blue-500">
+                      <FileText className="w-5 h-5" />
+                    </div>
+                    <div className="form-section-card-header-text">
+                      <h3>Observación y estado</h3>
+                      <p>Notas adicionales y configuración de estado del usuario.</p>
+                    </div>
+                  </div>
+                  
+                  <div className="status-section-grid">
+                    <div className="form-group">
                       <label>Observación</label>
                       <textarea 
                         name="observacion"
                         value={formData.observacion} 
                         onChange={handleInputChange} 
-                        className="input-field textarea-field"
+                        className="textarea-field-mock"
                         placeholder="Notas adicionales sobre el usuario..."
                       />
                     </div>
                     
-                    <div className="form-group full-width">
-                      <div className="checkbox-row">
-                        <div className="checkbox-group">
-                          <label className="checkbox-label">
-                            <input 
-                              type="checkbox" 
-                              name="activo"
-                              checked={formData.activo} 
-                              onChange={handleInputChange} 
-                            />
-                            <span>Usuario Activo</span>
-                          </label>
+                    <div className="checkboxes-card-container">
+                      <label className="checkbox-card-item">
+                        <input 
+                          type="checkbox" 
+                          name="activo"
+                          checked={formData.activo} 
+                          onChange={handleInputChange} 
+                        />
+                        <span className="checkbox-card-custom-indicator"></span>
+                        <div className="checkbox-card-icon-box">
+                          <UserCheck className="w-5 h-5 text-emerald-500" />
                         </div>
-                        <div className="checkbox-group">
-                          <label className="checkbox-label">
-                            <input 
-                              type="checkbox" 
-                              name="debe_cambiar_password"
-                              checked={formData.debe_cambiar_password} 
-                              onChange={handleInputChange} 
-                            />
-                            <span>Exigir cambio de contraseña</span>
-                          </label>
+                        <div className="checkbox-card-content">
+                          <span className="checkbox-card-title">Usuario activo</span>
+                          <span className="checkbox-card-desc active-desc">El usuario podrá acceder al sistema.</span>
                         </div>
-                      </div>
+                      </label>
+
+                      <label className="checkbox-card-item">
+                        <input 
+                          type="checkbox" 
+                          name="debe_cambiar_password"
+                          checked={formData.debe_cambiar_password} 
+                          onChange={handleInputChange} 
+                        />
+                        <span className="checkbox-card-custom-indicator"></span>
+                        <div className="checkbox-card-icon-box">
+                          <Lock className="w-5 h-5 text-blue-500" />
+                        </div>
+                        <div className="checkbox-card-content">
+                          <span className="checkbox-card-title">Exigir cambio de contraseña</span>
+                          <span className="checkbox-card-desc">El usuario deberá cambiar su contraseña al iniciar sesión.</span>
+                        </div>
+                      </label>
                     </div>
                   </div>
                 </div>
@@ -718,11 +1178,13 @@ const Usuarios = () => {
               </div>
 
               <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={handleCloseModal}>
-                  Cancelar
+                <button type="button" className="btn-modal-cancel" onClick={handleCloseModal}>
+                  <XCircle size={16} />
+                  <span>Cancelar</span>
                 </button>
-                <button type="submit" className="btn btn-primary">
-                  {currentUsuario ? 'Actualizar Usuario' : 'Guardar Usuario'}
+                <button type="submit" className="btn-modal-save">
+                  <UserPlus size={16} />
+                  <span>{currentUsuario ? 'Guardar usuario' : 'Guardar usuario'}</span>
                 </button>
               </div>
             </form>

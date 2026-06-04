@@ -1,8 +1,39 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import {
-  Plus, Edit2, Trash2, Calendar, X, MapPin, Users,
-  UserCheck, UserX, RefreshCw, ChevronLeft, CalendarRange, Clock, AlertTriangle
+  Plus,
+  Edit2,
+  Trash2,
+  Calendar,
+  X,
+  MapPin,
+  Users,
+  UserCheck,
+  UserX,
+  RefreshCw,
+  ChevronLeft,
+  ChevronRight,
+  CalendarRange,
+  Clock,
+  AlertTriangle,
+  Building,
+  Info,
+  ArrowRight,
+  User,
+  Search,
+  Filter,
+  ChevronDown,
+  ArrowLeftRight,
+  Sun,
+  Moon,
+  Lock,
+  MoreVertical,
+  Check,
+  UserPlus,
+  LogIn,
+  LogOut,
+  FileText
 } from 'lucide-react';
 import MainLayout from '../layouts/MainLayout';
 import { useNotification } from '../context/NotificationContext';
@@ -18,9 +49,34 @@ const getLocalDateString = () => {
   return `${year}-${month}-${day}`;
 };
 
+const getInitials = (name) => {
+  if (!name) return 'U';
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  }
+  return parts[0].substring(0, 2).toUpperCase();
+};
+
+const getAvatarTheme = (name) => {
+  const colors = [
+    { bg: '#dcfce7', text: '#15803d' }, // Green (PA style)
+    { bg: '#f3e8ff', text: '#7e22ce' }, // Purple (CB style)
+    { bg: '#ffe4e6', text: '#be123c' }, // Rose
+    { bg: '#fff7ed', text: '#ea580c' }, // Orange (JM style)
+    { bg: '#e0f2fe', text: '#0284c7' }, // Sky/Blue
+    { bg: '#ecfeff', text: '#0891b2' }  // Cyan
+  ];
+  let sum = 0;
+  if (name) {
+    sum = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  }
+  return colors[sum % colors.length];
+};
+
 const GestionJornada = () => {
   const navigate = useNavigate();
-  const { showNotification } = useNotification();
+  const { showNotification, showConfirm } = useNotification();
 
   // Level 1 vs Level 2 navigation
   const [selectedSede, setSelectedSede] = useState(null); // Sede object or null
@@ -35,6 +91,19 @@ const GestionJornada = () => {
   const [usuariosConHorario, setUsuariosConHorario] = useState([]);
   const [usuariosSinHorario, setUsuariosSinHorario] = useState([]);
   const [intercambios, setIntercambios] = useState([]);
+
+  // States for con_horario tab search and pagination
+  const [conHorarioSearchTerm, setConHorarioSearchTerm] = useState('');
+  const [conHorarioSelectedHorario, setConHorarioSelectedHorario] = useState('');
+  const [conHorarioCurrentPage, setConHorarioCurrentPage] = useState(1);
+
+  // States for intercambios tab search, filter and pagination
+  const [intercambioSearchTerm, setIntercambioSearchTerm] = useState('');
+  const [intercambioSelectedEstado, setIntercambioSelectedEstado] = useState('');
+  const [intercambioCurrentPage, setIntercambioCurrentPage] = useState(1);
+
+  // States for sin_horario tab banner dismissal
+  const [showSinHorarioBanner, setShowSinHorarioBanner] = useState(true);
 
   // Modals state
   const [isHorarioModalOpen, setIsHorarioModalOpen] = useState(false);
@@ -88,6 +157,60 @@ const GestionJornada = () => {
     motivo: '',
     observacion: ''
   });
+
+  const getUserAssignedSchedule = (userId) => {
+    if (!userId) return null;
+    
+    // Find active assignment for this user (independent of date)
+    const assignment = usuariosConHorario.find(uh => uh.usuario === parseInt(userId) && uh.activo);
+    if (!assignment) return null;
+
+    // Find the schedule definition
+    const horario = horarios.find(h => h.id === assignment.horario);
+    if (!horario || !horario.activo) return null;
+
+    // Find the first active day detail to get the hours
+    const firstActiveDetail = horario.detalles?.find(d => d.activo);
+    if (!firstActiveDetail) return null;
+
+    return {
+      horario,
+      detail: firstActiveDetail
+    };
+  };
+
+  const parseTimeToMinutes = (timeStr) => {
+    if (!timeStr) return 0;
+    const parts = timeStr.split(':');
+    const h = parseInt(parts[0]) || 0;
+    const m = parseInt(parts[1]) || 0;
+    return h * 60 + m;
+  };
+
+  // Dropdown states for Asignar Horario modal
+  const [isHorarioDropdownOpen, setIsHorarioDropdownOpen] = useState(false);
+  const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
+  const [userSearchDropdownTerm, setUserSearchDropdownTerm] = useState('');
+
+  // Refs for click outside detection
+  const horarioDropdownRef = useRef(null);
+  const userDropdownRef = useRef(null);
+
+  // Click outside hook
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (horarioDropdownRef.current && !horarioDropdownRef.current.contains(event.target)) {
+        setIsHorarioDropdownOpen(false);
+      }
+      if (userDropdownRef.current && !userDropdownRef.current.contains(event.target)) {
+        setIsUserDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   // Fetch Level 1 Resumen
   const fetchSedesResumen = async () => {
@@ -237,13 +360,20 @@ const GestionJornada = () => {
         });
       }
 
+      // Find currently assigned active users for this schedule
+      const assignedUH = usuariosConHorario.filter(uh => uh.horario === horario.id && uh.activo);
+      const assignedUserIds = assignedUH.map(uh => uh.usuario);
+      const firstUH = assignedUH[0];
+      const vigenteDesdeVal = firstUH ? firstUH.vigente_desde : getLocalDateString();
+      const vigenteHastaVal = firstUH ? (firstUH.vigente_hasta || '') : '';
+
       setHorarioForm({
         nombre: horario.nombre,
         descripcion: horario.descripcion || '',
         detalles: mappedDetalles,
-        usuarios_asignados: [],
-        vigente_desde: getLocalDateString(),
-        vigente_hasta: ''
+        usuarios_asignados: assignedUserIds,
+        vigente_desde: vigenteDesdeVal,
+        vigente_hasta: vigenteHastaVal
       });
     } else {
       setCurrentHorario(null);
@@ -340,9 +470,6 @@ const GestionJornada = () => {
         hora_inicio_salida: globalTimes.hora_inicio_salida,
         hora_fin_salida: globalTimes.hora_fin_salida
       };
-      if (!currentHorario) {
-        payload.usuarios_ids = horarioForm.usuarios_asignados;
-      }
     } else {
       // Personalizado por Días Mode
       payload = {
@@ -358,17 +485,12 @@ const GestionJornada = () => {
           hora_fin_salida: d.hora_fin_salida
         }))
       };
-      if (!currentHorario) {
-        payload.usuarios_ids = horarioForm.usuarios_asignados;
-      }
     }
 
-    // Include vigency variables on creation if users are assigned
-    if (!currentHorario && horarioForm.usuarios_asignados.length > 0) {
+    payload.usuarios_ids = horarioForm.usuarios_asignados;
+    if (horarioForm.usuarios_asignados.length > 0) {
       payload.vigente_desde = horarioForm.vigente_desde;
-      if (horarioForm.vigente_hasta) {
-        payload.vigente_hasta = horarioForm.vigente_hasta;
-      }
+      payload.vigente_hasta = horarioForm.vigente_hasta || null;
     }
 
     try {
@@ -399,6 +521,12 @@ const GestionJornada = () => {
         showNotification(currentHorario ? 'Horario actualizado exitosamente.' : 'Horario creado y configurado exitosamente.', 'success');
         setIsHorarioModalOpen(false);
         fetchSedeDetailData(selectedSede.sede_id);
+        if (!currentHorario && horarioForm.usuarios_asignados && horarioForm.usuarios_asignados.length > 0) {
+          setActiveTab('con_horario');
+          setConHorarioSearchTerm('');
+          setConHorarioSelectedHorario('');
+          setConHorarioCurrentPage(1);
+        }
       } else {
         const errData = await res.json();
         showNotification(errData.error || 'No se pudo guardar la configuración de horario.', 'error');
@@ -410,7 +538,7 @@ const GestionJornada = () => {
   };
 
   const handleDeleteHorario = async (id) => {
-    if (!window.confirm('¿Desea desactivar y eliminar este horario? Esto afectará a todos los operarios asignados.')) return;
+    if (!await showConfirm('Eliminar Horario', '¿Desea desactivar y eliminar este horario? Esto afectará a todos los operarios asignados.', 'danger')) return;
     const token = localStorage.getItem('access_token');
     try {
       const res = await fetch(`${API_URL}/horarios/${id}/`, {
@@ -430,14 +558,81 @@ const GestionJornada = () => {
   };
 
   // --- ASIGNAR HORARIO ACTIONS ---
+  const getHorarioSummary = (h) => {
+    if (!h || !h.detalles || h.detalles.length === 0) return 'Sin detalles';
+    const activeDays = h.detalles.filter(d => d.activo);
+    if (activeDays.length === 0) return 'Sin días activos';
+
+    const dayAbbrs = {
+      lunes: 'Lun', martes: 'Mar', miercoles: 'Mié', jueves: 'Jue',
+      viernes: 'Vie', sabado: 'Sáb', domingo: 'Dom'
+    };
+
+    const dayNames = activeDays.map(d => dayAbbrs[d.dia_semana.toLowerCase()] || d.dia_semana);
+    const daysStr = dayNames.join(', ');
+
+    const firstDay = activeDays[0];
+    const startEntrada = firstDay.hora_inicio_entrada?.substring(0, 5) || '00:00';
+    const endEntrada = firstDay.hora_fin_entrada?.substring(0, 5) || '00:00';
+    const startSalida = firstDay.hora_inicio_salida?.substring(0, 5) || '00:00';
+    const endSalida = firstDay.hora_fin_salida?.substring(0, 5) || '00:00';
+
+    return `${daysStr} · Entrada ${startEntrada}-${endEntrada} · Salida ${startSalida}-${endSalida}`;
+  };
+
+  const checkScheduleConflict = (uId, proposedHorarioId, proposedDesde, proposedHasta) => {
+    if (!proposedHorarioId || !proposedDesde) return null;
+
+    const newHorario = horarios.find(h => h.id === parseInt(proposedHorarioId));
+    if (!newHorario || !newHorario.detalles) return null;
+
+    const newActiveDays = new Set(
+      newHorario.detalles.filter(d => d.activo).map(d => d.dia_semana.toLowerCase())
+    );
+
+    const nS = new Date(proposedDesde + 'T00:00:00');
+    const nE = proposedHasta ? new Date(proposedHasta + 'T00:00:00') : null;
+
+    const userAssignments = usuariosConHorario.filter(uh => uh.usuario === uId);
+
+    for (const assignment of userAssignments) {
+      const aS = new Date(assignment.vigente_desde + 'T00:00:00');
+      const aE = assignment.vigente_hasta ? new Date(assignment.vigente_hasta + 'T00:00:00') : null;
+
+      const datesOverlap = (!nE || aS <= nE) && (!aE || nS <= aE);
+
+      if (datesOverlap) {
+        const existingHorario = horarios.find(h => h.id === assignment.horario);
+        if (existingHorario && existingHorario.detalles) {
+          const existingActiveDays = existingHorario.detalles
+            .filter(d => d.activo)
+            .map(d => d.dia_semana.toLowerCase());
+
+          const commonDays = existingActiveDays.filter(day => newActiveDays.has(day));
+          if (commonDays.length > 0) {
+            return {
+              assignment,
+              horario: existingHorario,
+              commonDays
+            };
+          }
+        }
+      }
+    }
+    return null;
+  };
+
   const handleOpenAssignModal = (quickUser = null) => {
     setAssignForm({
       usuarios: quickUser ? [quickUser.id] : [],
-      horario: horarios.length > 0 ? horarios[0].id : '',
+      horario: '',
       vigente_desde: getLocalDateString(),
       vigente_hasta: '',
       observacion: ''
     });
+    setIsHorarioDropdownOpen(false);
+    setIsUserDropdownOpen(false);
+    setUserSearchDropdownTerm('');
     setIsAssignModalOpen(true);
   };
 
@@ -460,34 +655,145 @@ const GestionJornada = () => {
       return;
     }
 
+    // Date range validation
+    if (assignForm.vigente_hasta && assignForm.vigente_desde > assignForm.vigente_hasta) {
+      showNotification('La fecha "Vigente Hasta" no puede ser anterior a "Vigente Desde".', 'warning');
+      return;
+    }
+
+    // Conflict validation
+    const conflictingUsers = [];
+    const nonConflictingUsers = [];
+
+    for (const uId of assignForm.usuarios) {
+      const conflict = checkScheduleConflict(
+        uId,
+        assignForm.horario,
+        assignForm.vigente_desde,
+        assignForm.vigente_hasta
+      );
+
+      if (conflict) {
+        const userObj = usuariosSede.find(u => u.id === uId);
+        conflictingUsers.push({
+          user: userObj,
+          conflict
+        });
+      } else {
+        nonConflictingUsers.push(uId);
+      }
+    }
+
+    let usersToAssign = [...assignForm.usuarios];
+
+    if (conflictingUsers.length > 0) {
+      const conflictMessages = conflictingUsers.map(item => {
+        return `- ${item.user.nombre_completo} (tiene turno cruzado '${item.conflict.horario.nombre}')`;
+      }).join('\n');
+
+      if (nonConflictingUsers.length === 0) {
+        // All selected users have conflicts
+        showNotification(
+          `No se puede realizar la asignación. Los usuarios seleccionados presentan conflictos de horario:\n${conflictMessages}`,
+          'error'
+        );
+        return;
+      }
+
+      // Some users have conflicts, some don't. Ask if we want to proceed.
+      const confirmProceed = await showConfirm(
+        'Conflictos de Horario Detectados',
+        `Los siguientes usuarios ya tienen un turno asignado en ese rango:\n${conflictMessages}\n\n¿Desea continuar la asignación excluyendo a los usuarios con conflicto?`,
+        'warning'
+      );
+
+      if (!confirmProceed) {
+        return; // Stop assignment
+      }
+
+      usersToAssign = nonConflictingUsers;
+    }
+
     const token = localStorage.getItem('access_token');
     try {
-      const promises = assignForm.usuarios.map(uId => {
-        return fetch(`${API_URL}/usuario-horarios/`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            usuario: uId,
-            horario: assignForm.horario,
-            vigente_desde: assignForm.vigente_desde,
-            vigente_hasta: assignForm.vigente_hasta || null,
-            observacion: assignForm.observacion
-          })
-        });
+      const promises = usersToAssign.map(async (uId) => {
+        try {
+          const res = await fetch(`${API_URL}/usuario-horarios/`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              usuario: uId,
+              horario: assignForm.horario,
+              vigente_desde: assignForm.vigente_desde,
+              vigente_hasta: assignForm.vigente_hasta || null,
+              observacion: assignForm.observacion
+            })
+          });
+          const isOk = res.ok;
+          let errMsg = null;
+          if (!isOk) {
+            try {
+              const data = await res.json();
+              errMsg = data.error || `Error ${res.status}`;
+            } catch (e) {
+              errMsg = `Error ${res.status}`;
+            }
+          }
+          return { uId, ok: isOk, error: errMsg };
+        } catch (err) {
+          return { uId, ok: false, error: err.message || 'Error de conexión' };
+        }
       });
 
       const results = await Promise.all(promises);
-      const allOk = results.every(r => r.ok);
+      const successfulIds = results.filter(r => r.ok).map(r => r.uId);
+      const failedResults = results.filter(r => !r.ok);
 
-      if (allOk) {
+      if (successfulIds.length > 0) {
+        // Refresh the detail data immediately to update the lists
+        await fetchSedeDetailData(selectedSede.sede_id);
+        
+        // Remove successful users from the modal form selection
+        setAssignForm(prev => ({
+          ...prev,
+          usuarios: prev.usuarios.filter(id => !successfulIds.includes(id))
+        }));
+      }
+
+      if (failedResults.length === 0) {
         showNotification('Horarios asignados correctamente.', 'success');
         setIsAssignModalOpen(false);
-        fetchSedeDetailData(selectedSede.sede_id);
+        // Switch to "Usuarios con horario" tab and clear filters to instantly see the changes
+        setActiveTab('con_horario');
+        setConHorarioSearchTerm('');
+        setConHorarioSelectedHorario('');
+        setConHorarioCurrentPage(1);
       } else {
-        showNotification('Ocurrió un inconveniente al asignar algunos horarios.', 'warning');
+        const errorMessages = Array.from(new Set(failedResults.map(r => r.error)));
+        const userNames = failedResults.map(r => {
+          const u = usuariosSede.find(us => us.id === r.uId);
+          return u ? u.nombre_completo : `Usuario #${r.uId}`;
+        }).join(', ');
+
+        if (successfulIds.length > 0) {
+          showNotification(
+            `Asignación parcial realizada. Se asignó a ${successfulIds.length} usuario(s). Falló para: ${userNames}. Detalle: ${errorMessages.join(' | ')}`,
+            'warning'
+          );
+          setIsAssignModalOpen(false);
+          setActiveTab('con_horario');
+          setConHorarioSearchTerm('');
+          setConHorarioSelectedHorario('');
+          setConHorarioCurrentPage(1);
+        } else {
+          showNotification(
+            `No se pudo realizar la asignación. Falló para: ${userNames}. Detalle: ${errorMessages.join(' | ')}`,
+            'error'
+          );
+        }
       }
     } catch (err) {
       console.error(err);
@@ -496,7 +802,7 @@ const GestionJornada = () => {
   };
 
   const handleDeleteAssignment = async (assignmentId) => {
-    if (!window.confirm('¿Desactivar la asignación de horario para este usuario?')) return;
+    if (!await showConfirm('Desactivar Asignación', '¿Desactivar la asignación de horario para este usuario?', 'danger')) return;
     const token = localStorage.getItem('access_token');
     try {
       const res = await fetch(`${API_URL}/usuario-horarios/${assignmentId}/`, {
@@ -505,7 +811,11 @@ const GestionJornada = () => {
       });
       if (res.ok) {
         showNotification('Horario removido exitosamente del usuario.', 'success');
-        fetchSedeDetailData(selectedSede.sede_id);
+        // Refresh the detail data immediately to update the lists
+        await fetchSedeDetailData(selectedSede.sede_id);
+        // Switch to "Usuarios sin horario" tab and clear filters to instantly see the changes
+        setActiveTab('sin_horario');
+        setShowSinHorarioBanner(true);
       } else {
         showNotification('Error al remover el horario.', 'error');
       }
@@ -568,7 +878,7 @@ const GestionJornada = () => {
   };
 
   const handleDeleteSwap = async (id) => {
-    if (!window.confirm('¿Eliminar y anular este intercambio de turnos?')) return;
+    if (!await showConfirm('Anular Intercambio', '¿Eliminar y anular este intercambio de turnos?', 'danger')) return;
     const token = localStorage.getItem('access_token');
     try {
       const res = await fetch(`${API_URL}/intercambios/${id}/`, {
@@ -587,6 +897,29 @@ const GestionJornada = () => {
     }
   };
 
+  // Calculations for con_horario tab (KPIs and Filters)
+  const pctConHorario = usuariosSede.length > 0 ? Math.round((usuariosConHorario.length / usuariosSede.length) * 100) : 0;
+  
+  const vigentesEstaSemana = usuariosConHorario.filter(uh => {
+    if (!uh.vigente_hasta) return true;
+    const hastaDate = new Date(uh.vigente_hasta);
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    return hastaDate >= today;
+  }).length;
+  
+  const pctVigentes = usuariosConHorario.length > 0 ? Math.round((vigentesEstaSemana / usuariosConHorario.length) * 100) : 0;
+
+  const proximosVencimientos = usuariosConHorario.filter(uh => {
+    if (!uh.vigente_hasta) return false;
+    const hasta = new Date(uh.vigente_hasta);
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    const diffTime = hasta - today;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays >= 0 && diffDays <= 7;
+  }).length;
+
   return (
     <MainLayout
       title="Gestión de Horarios y Jornadas"
@@ -598,9 +931,16 @@ const GestionJornada = () => {
       {!selectedSede ? (
         // ================= LEVEL 1: SEDES GRID =================
         <div className="sedes-overview">
-          <div className="section-title-wrapper">
+          <div className="panel-header-box">
+            <div className="panel-header-icon-container">
+              <Building size={22} />
+            </div>
             <h2>Panel General por Sedes</h2>
-            <p>Seleccione una sede para gestionar sus turnos, horarios y auditar intercambios.</p>
+          </div>
+
+          <div className="panel-info-banner">
+            <Info size={16} className="info-icon" />
+            <span>Seleccione una sede para gestionar sus turnos, horarios y auditar intercambios.</span>
           </div>
 
           {loadingResumen ? (
@@ -617,42 +957,51 @@ const GestionJornada = () => {
             <div className="sedes-grid">
               {sedesResumen.map(sede => (
                 <div key={sede.sede_id} className="sede-card-premium">
-                  <div className="sede-card-glow"></div>
                   <div className="sede-card-content">
                     <div className="sede-header-premium">
-                      <div className="sede-icon-bg">
-                        <MapPin size={24} />
+                      <div className="sede-header-left">
+                        <div className="sede-icon-bg">
+                          <MapPin size={18} />
+                        </div>
+                        <h3 className="sede-title-premium">{sede.sede_nombre}</h3>
                       </div>
-                      <h3 className="sede-title-premium">{sede.sede_nombre}</h3>
                     </div>
 
                     <div className="sede-metrics-grid">
                       <div className="metric-box">
-                        <Clock size={18} className="text-accent" />
+                        <div className="metric-icon-bg">
+                          <Calendar size={18} />
+                        </div>
                         <div className="metric-info">
                           <span className="metric-value">{sede.horarios_creados}</span>
-                          <span className="metric-label">Horarios Creados</span>
+                          <span className="metric-label">Horarios creados</span>
                         </div>
                       </div>
                       <div className="metric-box">
-                        <UserCheck size={18} className="text-success" />
+                        <div className="metric-icon-bg">
+                          <User size={18} />
+                        </div>
                         <div className="metric-info">
                           <span className="metric-value">{sede.usuarios_con_horario}</span>
-                          <span className="metric-label">Usuarios c/ Horario</span>
+                          <span className="metric-label">Usuarios c/ horario</span>
                         </div>
                       </div>
                       <div className="metric-box">
-                        <UserX size={18} className="text-warning" />
+                        <div className="metric-icon-bg">
+                          <Users size={18} />
+                        </div>
                         <div className="metric-info">
                           <span className="metric-value">{sede.usuarios_sin_horario}</span>
-                          <span className="metric-label">Usuarios s/ Horario</span>
+                          <span className="metric-label">Usuarios s/ horario</span>
                         </div>
                       </div>
                       <div className="metric-box">
-                        <RefreshCw size={18} className="text-primary" />
+                        <div className="metric-icon-bg">
+                          <RefreshCw size={18} />
+                        </div>
                         <div className="metric-info">
                           <span className="metric-value">{sede.intercambios_count}</span>
-                          <span className="metric-label">Intercambios Aprob.</span>
+                          <span className="metric-label">Intercambios aprob.</span>
                         </div>
                       </div>
                     </div>
@@ -661,7 +1010,8 @@ const GestionJornada = () => {
                       className="btn-premium-action mt-6 w-full"
                       onClick={() => handleSelectSede(sede)}
                     >
-                      Gestionar Horarios
+                      <span>Gestionar Horarios</span>
+                      <ArrowRight size={16} />
                     </button>
                   </div>
                 </div>
@@ -737,7 +1087,7 @@ const GestionJornada = () => {
 
               {/* --- TAB 1: HORARIOS CREADOS --- */}
               {activeTab === 'horarios' && (
-                <div className="horarios-tab">
+                <div className="horarios-tab-p">
                   {horarios.length === 0 ? (
                     <div className="empty-state-tab">
                       <Clock size={48} className="empty-icon-tab" />
@@ -748,221 +1098,943 @@ const GestionJornada = () => {
                       </button>
                     </div>
                   ) : (
-                    <div className="horarios-list-grid">
-                      {horarios.map(h => (
-                        <div key={h.id} className="horario-detail-card">
-                          <div className="horario-card-header">
-                            <div>
-                              <h4>{h.nombre}</h4>
-                              <p className="horario-desc">{h.descripcion || 'Sin descripción'}</p>
-                            </div>
-                            <div className="horario-actions">
-                              <button className="btn-icon-detail text-primary" onClick={() => handleOpenHorarioModal(h)}>
-                                <Edit2 size={16} />
-                              </button>
-                              <button className="btn-icon-detail text-danger" onClick={() => handleDeleteHorario(h.id)}>
-                                <Trash2 size={16} />
-                              </button>
-                            </div>
-                          </div>
+                    <div className="horarios-container-grid-p">
+                      <div className="horarios-cards-grid-p">
+                        {horarios.map(h => {
+                          // Filter details to active days
+                          const activeDetails = h.detalles ? h.detalles.filter(d => d.activo) : [];
+                          
+                          // Day name translation map for abbreviation
+                          const dayAbbrMap = {
+                            'lunes': 'Lun',
+                            'martes': 'Mar',
+                            'miercoles': 'Mié',
+                            'jueves': 'Jue',
+                            'viernes': 'Vie',
+                            'sabado': 'Sáb',
+                            'domingo': 'Dom'
+                          };
 
-                          <div className="horario-days-summary">
-                            <h5>Rangos diarios configurados:</h5>
-                            <div className="days-ranges-list">
-                              {h.detalles && h.detalles.map(d => (
-                                <div key={d.id} className="day-range-row">
-                                  <span className="day-label-pill capitalize">{d.dia_semana}</span>
-                                  <div className="time-range-box">
-                                    <span className="time-badge input-badge">Entrada: {d.hora_inicio_entrada.substring(0, 5)} - {d.hora_fin_entrada.substring(0, 5)}</span>
-                                    <span className="time-badge output-badge">Salida: {d.hora_inicio_salida.substring(0, 5)} - {d.hora_fin_salida.substring(0, 5)}</span>
+                          // Sort active details in standard weekday order
+                          const weekdayOrder = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'];
+                          const sortedDetails = [...activeDetails].sort((a, b) => {
+                            return weekdayOrder.indexOf(a.dia_semana.toLowerCase()) - weekdayOrder.indexOf(b.dia_semana.toLowerCase());
+                          });
+
+                          // Extract first active day ranges for summary display
+                          const firstActive = sortedDetails[0];
+                          const entradaRange = firstActive 
+                            ? `${firstActive.hora_inicio_entrada.substring(0, 5)} - ${firstActive.hora_fin_entrada.substring(0, 5)}`
+                            : '00:00 - 00:00';
+                          const salidaRange = firstActive 
+                            ? `${firstActive.hora_inicio_salida.substring(0, 5)} - ${firstActive.hora_fin_salida.substring(0, 5)}`
+                            : '00:00 - 00:00';
+
+                          // Dynamic theme icon selection based on name
+                          const lowercaseName = h.nombre.toLowerCase();
+                          let iconThemeClass = 'default';
+                          let IconComponent = Clock;
+                          
+                          if (lowercaseName.includes('mañana') || lowercaseName.includes('dia') || lowercaseName.includes('día')) {
+                            iconThemeClass = 'morning';
+                            IconComponent = Sun;
+                          } else if (lowercaseName.includes('tarde') || lowercaseName.includes('noche') || lowercaseName.includes('vespertino')) {
+                            iconThemeClass = 'evening';
+                            IconComponent = Moon;
+                          }
+
+                          // Calculate assigned users statistics dynamically
+                          const assignedUH = usuariosConHorario.filter(uh => uh.horario === h.id);
+                          const assignedUsers = assignedUH.map(uh => usuariosSede.find(u => u.id === uh.usuario)).filter(Boolean);
+                          const userCount = assignedUsers.length;
+                          const rolesList = Array.from(new Set(assignedUsers.map(u => u.rol_info?.nombre || u.rol?.nombre || u.cargo || 'Operador')));
+                          const rolesStr = rolesList.length > 0 ? rolesList.join(', ') : 'Sin personal asignado';
+
+                          return (
+                            <div key={h.id} className="horario-card-premium-p">
+                              {/* Header: Icon, Status, Actions */}
+                              <div className="horario-card-top-p">
+                                <div className={`schedule-icon-circle-p ${iconThemeClass}`}>
+                                  <IconComponent size={20} />
+                                </div>
+                                <div className="horario-card-top-right-p">
+                                  <div className="schedule-actions-p">
+                                    <button 
+                                      className="btn-schedule-edit-p" 
+                                      onClick={() => handleOpenHorarioModal(h)}
+                                      title="Editar Horario"
+                                      type="button"
+                                    >
+                                      <Edit2 size={14} />
+                                    </button>
+                                    <button 
+                                      className="btn-schedule-delete-p" 
+                                      onClick={() => handleDeleteHorario(h.id)}
+                                      title="Eliminar Horario"
+                                      type="button"
+                                    >
+                                      <Trash2 size={14} />
+                                    </button>
                                   </div>
                                 </div>
-                              ))}
-                            </div>
-                          </div>
+                              </div>
 
-                          <div className="horario-card-footer">
-                            <Users size={16} />
-                            <span>{h.usuario_count} operadores / asesores asignados</span>
-                          </div>
+                              {/* Title & Description */}
+                              <div className="horario-card-info-p">
+                                <h4>{h.nombre}</h4>
+                                <p className="horario-desc-p">{h.descripcion || 'Sin descripción'}</p>
+                              </div>
+
+                              {/* Configured Days pills */}
+                              <div className="horario-days-section-p">
+                                <span className="days-label-title-p">DÍAS CONFIGURADOS</span>
+                                <div className="days-pills-row-p">
+                                  {sortedDetails.map(d => (
+                                    <span key={d.id} className="day-pill-p">
+                                      {dayAbbrMap[d.dia_semana.toLowerCase()] || d.dia_semana.substring(0, 3)}
+                                    </span>
+                                  ))}
+                                  {sortedDetails.length === 0 && (
+                                    <span className="day-pill-empty-p">Ninguno</span>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Time ranges panel */}
+                              <div className="horario-ranges-panel-p">
+                                <div className="range-box-column-p green">
+                                  <span className="range-box-label-p">Entrada</span>
+                                  <span className="range-box-value-p">{entradaRange}</span>
+                                </div>
+                                <div className="range-box-column-p orange">
+                                  <span className="range-box-label-p">Salida</span>
+                                  <span className="range-box-value-p">{salidaRange}</span>
+                                </div>
+                              </div>
+
+                              {/* Footer: User count & Roles */}
+                              <div className="horario-card-footer-p">
+                                <Users size={16} className="footer-users-icon-p" />
+                                <div className="footer-text-col-p">
+                                  <span className="footer-count-text-p">
+                                    {userCount} {userCount === 1 ? 'usuario asignado' : 'usuarios asignados'}
+                                  </span>
+                                  <span className="footer-roles-text-p">{rolesStr}</span>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Bottom "Crear nuevo horario" dotted card */}
+                      <div 
+                        className="horario-create-dotted-card-p" 
+                        onClick={() => handleOpenHorarioModal()}
+                      >
+                        <div className="create-dotted-icon-p">
+                          <Plus size={20} />
                         </div>
-                      ))}
+                        <div className="create-dotted-text-p">
+                          <h5>Crear nuevo horario</h5>
+                          <p>Define un nuevo horario y asígnalo a tu equipo.</p>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
               )}
 
               {/* --- TAB 2: USUARIOS CON HORARIO --- */}
-              {activeTab === 'con_horario' && (
-                <div className="con-horarios-tab">
-                  {usuariosConHorario.length === 0 ? (
-                    <div className="empty-state-tab">
-                      <UserCheck size={48} className="empty-icon-tab" />
-                      <h3>Ningún usuario asignado</h3>
-                      <p>Asigna turnos ya configurados al personal operativo de esta sede.</p>
-                      <button className="btn btn-primary mt-4" onClick={() => handleOpenAssignModal()}>
-                        Asignar Horario Ahora
-                      </button>
+              {activeTab === 'con_horario' && (() => {
+                // Filter the list
+                const filteredUH = usuariosConHorario.filter(uh => {
+                  const userDetail = usuariosSede.find(u => u.id === uh.usuario);
+                  const name = userDetail?.nombre_completo || uh.usuario_nombre || '';
+                  const email = userDetail?.email || '';
+                  const matchesSearch = name.toLowerCase().includes(conHorarioSearchTerm.toLowerCase()) || 
+                                        email.toLowerCase().includes(conHorarioSearchTerm.toLowerCase());
+                  const matchesHorario = conHorarioSelectedHorario === '' || uh.horario_nombre === conHorarioSelectedHorario;
+                  return matchesSearch && matchesHorario;
+                });
+
+                // Unique schedule names for the dropdown
+                const uniqueHorarioNames = Array.from(new Set(usuariosConHorario.map(uh => uh.horario_nombre).filter(Boolean)));
+
+                // Pagination calculations
+                const itemsPerPageConHorario = 5;
+                const totalPagesConHorario = Math.ceil(filteredUH.length / itemsPerPageConHorario) || 1;
+                const indexOfLastConHorario = conHorarioCurrentPage * itemsPerPageConHorario;
+                const indexOfFirstConHorario = indexOfLastConHorario - itemsPerPageConHorario;
+                const currentConHorarioList = filteredUH.slice(indexOfFirstConHorario, indexOfLastConHorario);
+
+                return (
+                  <div className="con-horarios-tab">
+                    {/* KPI Row */}
+                    <div className="con-horarios-kpis">
+                      <div className="con-horario-kpi-card">
+                        <div className="kpi-icon-bg success">
+                          <Users size={20} />
+                        </div>
+                        <div className="kpi-content">
+                          <span className="kpi-title">Asignaciones activas</span>
+                          <div className="kpi-value-row">
+                            <span className="kpi-value">{usuariosConHorario.length}</span>
+                            <span className="kpi-badge success">{pctConHorario}%</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="con-horario-kpi-card">
+                        <div className="kpi-icon-bg info">
+                          <Calendar size={20} />
+                        </div>
+                        <div className="kpi-content">
+                          <span className="kpi-title">Vigentes esta semana</span>
+                          <div className="kpi-value-row">
+                            <span className="kpi-value">{vigentesEstaSemana}</span>
+                            <span className="kpi-badge info">{pctVigentes}%</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="con-horario-kpi-card">
+                        <div className="kpi-icon-bg warning">
+                          <Clock size={20} />
+                        </div>
+                        <div className="kpi-content">
+                          <span className="kpi-title">Próximos vencimientos</span>
+                          <div className="kpi-value-row">
+                            <span className="kpi-value">{proximosVencimientos}</span>
+                            <span className="kpi-badge warning">7 días</span>
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                  ) : (
-                    <div className="table-responsive-p">
-                      <table className="data-table-p">
-                        <thead>
-                          <tr>
-                            <th>Usuario</th>
-                            <th>Rol</th>
-                            <th>Horario Turno</th>
-                            <th>Vigente Desde</th>
-                            <th>Vigente Hasta</th>
-                            <th>Observación</th>
-                            <th>Acciones</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {usuariosConHorario.map(uh => (
-                            <tr key={uh.id}>
-                              <td>
-                                <div className="font-semibold">{uh.usuario_nombre}</div>
-                              </td>
-                              <td><span className="rol-badge capitalize">{uh.usuario_rol}</span></td>
-                              <td><div className="font-medium text-accent">{uh.horario_nombre}</div></td>
-                              <td>{uh.vigente_desde}</td>
-                              <td>{uh.vigente_hasta || 'Indefinido'}</td>
-                              <td><span className="text-muted-p">{uh.observacion || '-'}</span></td>
-                              <td>
+
+                    {/* Main Grid Container Card */}
+                    <div className="con-horarios-container-card">
+                      {/* Filters Toolbar */}
+                      <div className="con-horarios-toolbar">
+                        <div className="toolbar-left">
+                          <div className="toolbar-search-wrapper">
+                            <Search size={16} className="search-icon" />
+                            <input 
+                              type="text" 
+                              placeholder="Buscar usuario..." 
+                              value={conHorarioSearchTerm}
+                              onChange={(e) => {
+                                setConHorarioSearchTerm(e.target.value);
+                                setConHorarioCurrentPage(1);
+                              }}
+                              className="toolbar-search-input"
+                            />
+                          </div>
+                          <div className="toolbar-select-wrapper">
+                            <select 
+                              value={conHorarioSelectedHorario}
+                              onChange={(e) => {
+                                setConHorarioSelectedHorario(e.target.value);
+                                setConHorarioCurrentPage(1);
+                              }}
+                              className="toolbar-select"
+                            >
+                              <option value="">Todos los horarios</option>
+                              {uniqueHorarioNames.map((name, idx) => (
+                                <option key={idx} value={name}>{name}</option>
+                              ))}
+                            </select>
+                            <ChevronDown size={14} className="select-chevron" />
+                          </div>
+                          <button className="btn-toolbar-filters" type="button">
+                            <Filter size={14} />
+                            <span>Filtros</span>
+                          </button>
+                        </div>
+                        <div className="toolbar-right">
+                          <span className="results-count">{filteredUH.length} resultados</span>
+                          <button 
+                            className="btn-toolbar-refresh" 
+                            onClick={() => fetchSedeDetailData(selectedSede.sede_id)}
+                            title="Actualizar datos"
+                            type="button"
+                          >
+                            <RefreshCw size={14} />
+                          </button>
+                        </div>
+                      </div>
+
+                      {filteredUH.length === 0 ? (
+                        <div className="empty-state-tab">
+                          <UserCheck size={48} className="empty-icon-tab" />
+                          <h3>No se encontraron asignaciones</h3>
+                          <p>Ajuste los filtros de búsqueda o asigne un nuevo horario.</p>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="table-responsive-p">
+                            <table className="data-table-p con-horario-table">
+                              <thead>
+                                <tr>
+                                  <th>Usuario</th>
+                                  <th>Rol</th>
+                                  <th>Horario asignado</th>
+                                  <th>
+                                    <div className="header-sort-cell">
+                                      <span>Vigente desde</span>
+                                      <ChevronDown size={12} />
+                                    </div>
+                                  </th>
+                                  <th>
+                                    <div className="header-sort-cell">
+                                      <span>Vigente hasta</span>
+                                      <ChevronDown size={12} />
+                                    </div>
+                                  </th>
+                                  <th>Observación</th>
+                                  <th style={{ textAlign: 'center' }}>Acciones</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {currentConHorarioList.map(uh => {
+                                  const userDetail = usuariosSede.find(u => u.id === uh.usuario);
+                                  const uName = userDetail?.nombre_completo || uh.usuario_nombre || 'Usuario';
+                                  const uEmail = userDetail?.email || 'sin-correo@dominio.com';
+                                  const uRol = userDetail?.rol_info?.nombre || userDetail?.rol?.nombre || userDetail?.cargo || uh.usuario_rol || 'Operador';
+                                  const avatarTheme = getAvatarTheme(uName);
+                                  
+                                  // Determine Schedule Color Theme dynamically
+                                  const scheduleThemeClass = 
+                                    uh.horario_nombre?.toLowerCase().includes('mañana') ? 'theme-morning' :
+                                    uh.horario_nombre?.toLowerCase().includes('tarde') ? 'theme-evening' : 'theme-default';
+
+                                  return (
+                                    <tr key={uh.id}>
+                                      <td>
+                                        <div className="user-profile-cell-p">
+                                          <div 
+                                            className="user-avatar-circle-p"
+                                            style={{
+                                              backgroundColor: avatarTheme.bg,
+                                              color: avatarTheme.text
+                                            }}
+                                          >
+                                            {getInitials(uName)}
+                                            <span className="status-dot-green"></span>
+                                          </div>
+                                          <div className="user-profile-text-p">
+                                            <span className="user-name-value-p">{uName}</span>
+                                            <span className="user-email-value-p">{uEmail}</span>
+                                          </div>
+                                        </div>
+                                      </td>
+                                      <td>
+                                        <span className={`rol-badge-pill-p ${uRol.toLowerCase()}`}>
+                                          {uRol}
+                                        </span>
+                                      </td>
+                                      <td>
+                                        <div className={`schedule-badge-pill-p ${scheduleThemeClass}`}>
+                                          <Clock size={12} className="schedule-badge-icon" />
+                                          <span>{uh.horario_nombre}</span>
+                                        </div>
+                                      </td>
+                                      <td><span className="date-value-p">{uh.vigente_desde}</span></td>
+                                      <td><span className="date-value-p">{uh.vigente_hasta || 'Indefinido'}</span></td>
+                                      <td><span className="obs-value-p">{uh.observacion || '-'}</span></td>
+                                      <td>
+                                        <div className="action-buttons-cell-p">
+                                          <button
+                                            className="btn-action-swap-p"
+                                            onClick={() => handleOpenSwapModal()}
+                                            title="Intercambio Temporal"
+                                            type="button"
+                                          >
+                                            <RefreshCw size={14} />
+                                          </button>
+                                          <button
+                                            className="btn-action-delete-p"
+                                            onClick={() => handleDeleteAssignment(uh.id)}
+                                            title="Remover Horario"
+                                            type="button"
+                                          >
+                                            <Trash2 size={14} />
+                                          </button>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+
+                          {/* Pagination Footer */}
+                          <div className="table-pagination-footer-p">
+                            <span className="pagination-legend-p">
+                              Mostrando {indexOfFirstConHorario + 1} a {Math.min(indexOfLastConHorario, filteredUH.length)} de {filteredUH.length} resultados
+                            </span>
+
+                            <div className="pagination-buttons-p">
+                              <button
+                                className="btn-page-arrow-p"
+                                onClick={() => setConHorarioCurrentPage(prev => Math.max(1, prev - 1))}
+                                disabled={conHorarioCurrentPage === 1}
+                                type="button"
+                              >
+                                <ChevronLeft size={14} />
+                              </button>
+                              {Array.from({ length: totalPagesConHorario }, (_, i) => i + 1).map(page => (
                                 <button
-                                  className="btn-icon-p text-danger"
-                                  onClick={() => handleDeleteAssignment(uh.id)}
-                                  title="Remover Horario"
+                                  key={page}
+                                  className={`btn-page-number-p ${conHorarioCurrentPage === page ? 'active' : ''}`}
+                                  onClick={() => setConHorarioCurrentPage(page)}
+                                  type="button"
                                 >
-                                  <Trash2 size={16} />
+                                  {page}
                                 </button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                              ))}
+                              <button
+                                className="btn-page-arrow-p"
+                                onClick={() => setConHorarioCurrentPage(prev => Math.min(totalPagesConHorario, prev + 1))}
+                                disabled={conHorarioCurrentPage === totalPagesConHorario}
+                                type="button"
+                              >
+                                <ChevronRight size={14} />
+                              </button>
+                            </div>
+                          </div>
+                        </>
+                      )}
                     </div>
-                  )}
-                </div>
-              )}
+                  </div>
+                );
+              })()}
 
               {/* --- TAB 3: USUARIOS SIN HORARIO --- */}
-              {activeTab === 'sin_horario' && (
-                <div className="sin-horarios-tab">
-                  {usuariosSinHorario.length === 0 ? (
-                    <div className="empty-state-tab success-tab">
-                      <UserCheck size={48} className="empty-icon-tab text-success" />
-                      <h3>¡Planilla Completa!</h3>
-                      <p>Todos los operarios y asesores de esta sede cuentan con un horario activo.</p>
-                    </div>
-                  ) : (
-                    <div className="alert-tab-info">
-                      <AlertTriangle size={18} />
-                      <span><strong>Atención:</strong> Los usuarios sin horario asignado tienen bloqueada la marcación de asistencia en la app móvil.</span>
-                    </div>
-                  )}
+              {activeTab === 'sin_horario' && (() => {
+                const getMockUpdateDate = (userId) => {
+                  const day = (userId * 7) % 28 + 1;
+                  const month = (userId * 3) % 12;
+                  const months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'set', 'oct', 'nov', 'dic'];
+                  const year = 2026;
+                  const hours = String((userId * 5) % 24).padStart(2, '0');
+                  const minutes = String((userId * 11) % 60).padStart(2, '0');
+                  return `${day} ${months[month]}. ${year} • ${hours}:${minutes}`;
+                };
 
-                  {usuariosSinHorario.length > 0 && (
-                    <div className="table-responsive-p mt-4">
-                      <table className="data-table-p">
-                        <thead>
-                          <tr>
-                            <th>Nombre Operativo</th>
-                            <th>Rol</th>
-                            <th>Estado Marcación</th>
-                            <th>Acción Rápida</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {usuariosSinHorario.map(u => (
-                            <tr key={u.id}>
-                              <td>
-                                <div className="font-semibold">{u.nombre_completo}</div>
-                                <small className="text-muted-p">{u.email}</small>
-                              </td>
-                              <td><span className="rol-badge capitalize">{u.rol_info?.nombre || u.rol?.nombre || u.cargo || 'Operador'}</span></td>
-                              <td>
-                                <span className="status-badge invalid">Marcación Bloqueada</span>
-                              </td>
-                              <td>
-                                <button
-                                  className="btn btn-primary btn-sm"
-                                  onClick={() => handleOpenAssignModal(u)}
-                                >
-                                  Asignar Turno
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-              )}
+                return (
+                  <div className="sin-horarios-tab-p">
+                    {usuariosSinHorario.length === 0 ? (
+                      <div className="empty-state-tab success-tab">
+                        <UserCheck size={48} className="empty-icon-tab text-success" />
+                        <h3>¡Planilla Completa!</h3>
+                        <p>Todos los operarios y asesores de esta sede cuentan con un horario activo.</p>
+                      </div>
+                    ) : (
+                      <>
+                        {/* Dismissible Info Banner */}
+                        {showSinHorarioBanner && (
+                          <div className="sin-horario-banner-p">
+                            <div className="banner-icon-circle-p">
+                              <Info size={18} />
+                            </div>
+                            <div className="banner-content-p">
+                              <h5>Usuarios sin horario asignado</h5>
+                              <p>Estos usuarios no tienen un turno asignado. Mientras estén en este estado, no podrán marcar su asistencia desde la app móvil.</p>
+                            </div>
+                            <button 
+                              className="banner-close-btn-p" 
+                              onClick={() => setShowSinHorarioBanner(false)}
+                              title="Cerrar"
+                              type="button"
+                            >
+                              <X size={16} />
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Toolbar Header */}
+                        <div className="sin-horario-header-p">
+                          <span className="sin-horario-count-p">
+                            {usuariosSinHorario.length} {usuariosSinHorario.length === 1 ? 'usuario sin horario' : 'usuarios sin horario'}
+                          </span>
+                          <button 
+                            className="btn-assign-multiple-p"
+                            onClick={() => handleOpenAssignModal()}
+                            type="button"
+                          >
+                            <Users size={16} />
+                            <span>Asignar a varios</span>
+                          </button>
+                        </div>
+
+                        {/* List of cards */}
+                        <div className="sin-horario-list-p">
+                          {usuariosSinHorario.map(u => {
+                            const avatarTheme = getAvatarTheme(u.nombre_completo);
+                            const uRol = u.rol_info?.nombre || u.rol?.nombre || u.cargo || 'Operador';
+                            const uSedeName = selectedSede?.sede_nombre || selectedSede?.nombre || 'Jaen';
+
+                            return (
+                              <div key={u.id} className="sin-horario-card-p">
+                                {/* Profile Info */}
+                                <div className="card-profile-col-p">
+                                  <div 
+                                    className="user-avatar-circle-p"
+                                    style={{
+                                      backgroundColor: avatarTheme.bg,
+                                      color: avatarTheme.text
+                                    }}
+                                  >
+                                    {getInitials(u.nombre_completo)}
+                                  </div>
+                                  <div className="user-profile-text-p">
+                                    <span className="user-name-value-p">{u.nombre_completo}</span>
+                                    <span className="user-email-value-p">{u.email || 'sin-correo@dominio.com'}</span>
+                                  </div>
+                                </div>
+
+                                {/* Role Badge */}
+                                <div className="card-role-col-p">
+                                  <span className={`rol-badge-pill-p ${uRol.toLowerCase().includes('asesor') ? 'asesor' : uRol.toLowerCase().includes('cajero') ? 'cajero' : 'operador'}`}>
+                                    {uRol}
+                                  </span>
+                                </div>
+
+                                {/* Status Warning */}
+                                <div className="card-status-col-p">
+                                  <span className="pending-status-badge-p">
+                                    <AlertTriangle size={12} />
+                                    <span>Sin turno asignado</span>
+                                  </span>
+                                </div>
+
+                                {/* Sede Info */}
+                                <div className="card-sede-col-p">
+                                  <Building size={14} className="card-meta-icon-p" />
+                                  <div className="card-meta-text-p">
+                                    <span className="meta-label-p">Sede</span>
+                                    <span className="meta-value-p">{uSedeName}</span>
+                                  </div>
+                                </div>
+
+                                {/* Last Update */}
+                                <div className="card-update-col-p">
+                                  <Calendar size={14} className="card-meta-icon-p" />
+                                  <div className="card-meta-text-p">
+                                    <span className="meta-label-p">Última actualización</span>
+                                    <span className="meta-value-p">{getMockUpdateDate(u.id)}</span>
+                                  </div>
+                                </div>
+
+                                {/* Action Buttons */}
+                                <div className="card-actions-col-p">
+                                  <button 
+                                    className="btn-card-assign-p"
+                                    onClick={() => handleOpenAssignModal(u)}
+                                    type="button"
+                                  >
+                                    Asignar turno
+                                  </button>
+                                  <button 
+                                    className="btn-card-more-p"
+                                    title="Más opciones"
+                                    type="button"
+                                  >
+                                    <MoreVertical size={16} />
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* Footer Disclaimer */}
+                        <div className="sin-horario-footer-note-p">
+                          <Info size={14} />
+                          <span>Al asignar un horario, el usuario podrá marcar su asistencia normalmente desde la app móvil.</span>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* --- TAB 4: INTERCAMBIOS --- */}
-              {activeTab === 'intercambios' && (
-                <div className="intercambios-tab">
-                  <div className="tab-action-row mb-4">
-                    <button className="btn btn-primary" onClick={handleOpenSwapModal}>
-                      <Plus size={16} />
-                      Registrar Intercambio Temporal
-                    </button>
-                  </div>
+              {activeTab === 'intercambios' && (() => {
+                // Filter the list
+                const filteredIntercambios = intercambios.filter(i => {
+                  const reqUser = usuariosSede.find(u => u.id === i.usuario_solicitante);
+                  const repUser = usuariosSede.find(u => u.id === i.usuario_reemplazo);
+                  const reqName = reqUser?.nombre_completo || i.usuario_solicitante_nombre || '';
+                  const repName = repUser?.nombre_completo || i.usuario_reemplazo_nombre || '';
+                  
+                  const matchesSearch = reqName.toLowerCase().includes(intercambioSearchTerm.toLowerCase()) || 
+                                        repName.toLowerCase().includes(intercambioSearchTerm.toLowerCase()) ||
+                                        (i.motivo || '').toLowerCase().includes(intercambioSearchTerm.toLowerCase());
+                                        
+                  const matchesEstado = intercambioSelectedEstado === '' || i.estado === intercambioSelectedEstado;
+                  return matchesSearch && matchesEstado;
+                });
 
-                  {intercambios.length === 0 ? (
-                    <div className="empty-state-tab">
-                      <CalendarRange size={48} className="empty-icon-tab" />
-                      <h3>Sin intercambios registrados</h3>
-                      <p>Use intercambios temporales si dos operarios realizarán cambios de turno para un día específico.</p>
+                // Pagination calculations
+                const itemsPerPageIntercambio = 5;
+                const totalPagesIntercambio = Math.ceil(filteredIntercambios.length / itemsPerPageIntercambio) || 1;
+                const indexOfLastIntercambio = intercambioCurrentPage * itemsPerPageIntercambio;
+                const indexOfFirstIntercambio = indexOfLastIntercambio - itemsPerPageIntercambio;
+                const currentIntercambioList = filteredIntercambios.slice(indexOfFirstIntercambio, indexOfLastIntercambio);
+
+                // Stats calculations
+                const statsPendientes = intercambios.filter(x => x.estado === 'pendiente').length;
+                const statsAprobadas = intercambios.filter(x => x.estado === 'aprobado').length;
+                const statsRechazadas = intercambios.filter(x => x.estado === 'rechazado').length;
+                const statsTotal = intercambios.length;
+
+                 // Helper for time ranges
+                const getScheduleRangeStr = (horarioId) => {
+                  if (!horarioId) return '';
+                  const h = horarios.find(x => x.id === horarioId);
+                  if (!h) return '';
+                  if (!h.detalles || h.detalles.length === 0) return 'Horario especial';
+                  const activeDetail = h.detalles.find(d => d.activo) || h.detalles[0];
+                  if (!activeDetail) return 'Horario especial';
+                  const start = activeDetail.hora_inicio_entrada?.substring(0, 5) || '00:00';
+                  const end = activeDetail.hora_fin_salida?.substring(0, 5) || '00:00';
+                  return `${start} - ${end}`;
+                };
+
+                // Helper for date formatting
+                const formatIntercambioDate = (dateStr) => {
+                  if (!dateStr) return { formatted: '-', dayName: '' };
+                  try {
+                    const dateParts = dateStr.split('-');
+                    if (dateParts.length !== 3) return { formatted: dateStr, dayName: '' };
+                    const year = dateParts[0];
+                    const month = dateParts[1];
+                    const day = dateParts[2];
+                    
+                    const dateObj = new Date(year, month - 1, day);
+                    const daysOfWeek = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+                    const dayName = daysOfWeek[dateObj.getDay()];
+                    
+                    return {
+                      formatted: `${day}/${month}/${year}`,
+                      dayName: dayName
+                    };
+                  } catch (e) {
+                    return { formatted: dateStr, dayName: '' };
+                  }
+                };
+
+                return (
+                  <div className="intercambios-tab-p">
+                    {/* KPI Cards Row */}
+                    <div className="intercambios-kpis-grid-p">
+                      <div className="intercambio-kpi-card-p">
+                        <div className="kpi-icon-circle-p yellow">
+                          <Clock size={20} />
+                        </div>
+                        <div className="kpi-content-p">
+                          <span className="kpi-title-p">Solicitudes pendientes</span>
+                          <span className="kpi-value-p">{statsPendientes}</span>
+                          <span className="kpi-subtitle-p">Esperando revisión</span>
+                        </div>
+                      </div>
+
+                      <div className="intercambio-kpi-card-p">
+                        <div className="kpi-icon-circle-p green">
+                          <UserCheck size={20} />
+                        </div>
+                        <div className="kpi-content-p">
+                          <span className="kpi-title-p">Aprobadas</span>
+                          <span className="kpi-value-p">{statsAprobadas}</span>
+                          <span className="kpi-subtitle-p">Turnos cubiertos</span>
+                        </div>
+                      </div>
+
+                      <div className="intercambio-kpi-card-p">
+                        <div className="kpi-icon-circle-p red">
+                          <X size={20} />
+                        </div>
+                        <div className="kpi-content-p">
+                          <span className="kpi-title-p">Rechazadas</span>
+                          <span className="kpi-value-p">{statsRechazadas}</span>
+                          <span className="kpi-subtitle-p">Historial</span>
+                        </div>
+                      </div>
+
+                      <div className="intercambio-kpi-card-p">
+                        <div className="kpi-icon-circle-p blue">
+                          <CalendarRange size={20} />
+                        </div>
+                        <div className="kpi-content-p">
+                          <span className="kpi-title-p">Total registradas</span>
+                          <span className="kpi-value-p">{statsTotal}</span>
+                          <span className="kpi-subtitle-p">Historial completo</span>
+                        </div>
+                      </div>
                     </div>
-                  ) : (
-                    <div className="table-responsive-p">
-                      <table className="data-table-p">
-                        <thead>
-                          <tr>
-                            <th>Fecha</th>
-                            <th>Solicitante (A)</th>
-                            <th>Reemplazo (B)</th>
-                            <th>Turno Orig (A)</th>
-                            <th>Turno Orig (B)</th>
-                            <th>Motivo / Auditoría</th>
-                            <th>Acciones</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {intercambios.map(i => (
-                            <tr key={i.id}>
-                              <td><strong>{i.fecha_intercambio}</strong></td>
-                              <td><div className="font-semibold">{i.usuario_solicitante_nombre}</div></td>
-                              <td><div className="font-semibold">{i.usuario_reemplazo_nombre}</div></td>
-                              <td><span className="text-accent">{i.horario_solicitante_original_nombre || 'Sede Respaldo'}</span></td>
-                              <td><span className="text-accent">{i.horario_reemplazo_original_nombre || 'Sede Respaldo'}</span></td>
-                              <td>
-                                <div className="motivo-box-info">
-                                  <p className="motivo-p font-medium">Motivo: {i.motivo}</p>
-                                  <small className="audit-span">Reg. por: {i.registrado_por_nombre}</small>
-                                </div>
-                              </td>
-                              <td>
+
+                    {/* Main Container Card */}
+                    <div className="intercambios-container-card-p">
+                      {/* Title block */}
+                      <div className="container-card-header-p">
+                        <h3>Registro de intercambios de horarios</h3>
+                      </div>
+
+                      {/* Toolbar */}
+                      <div className="intercambios-toolbar-p">
+                        <div className="toolbar-left-p">
+                          <div className="toolbar-search-wrapper-p">
+                            <Search size={16} className="search-icon-p" />
+                            <input 
+                              type="text" 
+                              placeholder="Buscar usuario..." 
+                              value={intercambioSearchTerm}
+                              onChange={(e) => {
+                                setIntercambioSearchTerm(e.target.value);
+                                setIntercambioCurrentPage(1);
+                              }}
+                              className="toolbar-search-input-p"
+                            />
+                          </div>
+                          <div className="toolbar-select-wrapper-p">
+                            <select 
+                              value={intercambioSelectedEstado}
+                              onChange={(e) => {
+                                setIntercambioSelectedEstado(e.target.value);
+                                setIntercambioCurrentPage(1);
+                              }}
+                              className="toolbar-select-p"
+                            >
+                              <option value="">Todos los estados</option>
+                              <option value="pendiente">Pendiente</option>
+                              <option value="aprobado">Aprobado</option>
+                              <option value="rechazado">Rechazado</option>
+                            </select>
+                            <ChevronDown size={14} className="select-chevron-p" />
+                          </div>
+                          <button className="btn-toolbar-filters-p" type="button">
+                            <Filter size={14} />
+                            <span>Filtros</span>
+                          </button>
+                        </div>
+                        <div className="toolbar-right-p">
+                          <span className="results-count-p">{filteredIntercambios.length} resultados</span>
+                        </div>
+                      </div>
+
+                      {/* Table or Empty State */}
+                      {filteredIntercambios.length === 0 ? (
+                        <div className="empty-state-tab">
+                          <CalendarRange size={48} className="empty-icon-tab" />
+                          <h3>Sin intercambios coincidentes</h3>
+                          <p>No se encontraron registros de intercambio de turnos con los filtros actuales.</p>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="table-responsive-p">
+                            <table className="data-table-p intercambios-table-p">
+                              <thead>
+                                <tr>
+                                  <th>Usuario origen</th>
+                                  <th style={{ width: '40px', textAlign: 'center' }}></th>
+                                  <th>Usuario reemplazo</th>
+                                  <th>Horario original</th>
+                                  <th>Horario nuevo / cubierto</th>
+                                  <th>Fecha del intercambio</th>
+                                  <th>Motivo / resumen</th>
+                                  <th>Estado</th>
+                                  <th style={{ textAlign: 'center' }}>Acciones</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {currentIntercambioList.map(i => {
+                                  const reqUser = usuariosSede.find(u => u.id === i.usuario_solicitante);
+                                  const repUser = usuariosSede.find(u => u.id === i.usuario_reemplazo);
+
+                                  const reqName = reqUser?.nombre_completo || i.usuario_solicitante_nombre || 'Usuario';
+                                  const reqRol = reqUser?.rol_info?.nombre || reqUser?.rol?.nombre || reqUser?.cargo || 'Operador';
+                                  const reqAvatarTheme = getAvatarTheme(reqName);
+
+                                  const repName = repUser?.nombre_completo || i.usuario_reemplazo_nombre || 'Usuario';
+                                  const repRol = repUser?.rol_info?.nombre || repUser?.rol?.nombre || repUser?.cargo || 'Operador';
+                                  const repAvatarTheme = getAvatarTheme(repName);
+
+                                  const origHorarioObj = horarios.find(h => h.id === i.horario_solicitante_original);
+                                  const hOrigName = origHorarioObj ? origHorarioObj.nombre : (i.horario_solicitante_original_nombre || 'Sin Horario');
+
+                                  const newHorarioObj = horarios.find(h => h.id === i.horario_reemplazo_original);
+                                  const hNewName = newHorarioObj ? newHorarioObj.nombre : (i.horario_reemplazo_original_nombre || 'Sin Horario');
+
+                                  const origThemeClass = 
+                                    hOrigName.toLowerCase().includes('mañana') ? 'theme-morning' :
+                                    hOrigName.toLowerCase().includes('tarde') ? 'theme-evening' : 'theme-default';
+                                  
+                                  const newThemeClass = 
+                                    hNewName.toLowerCase().includes('mañana') ? 'theme-morning' :
+                                    hNewName.toLowerCase().includes('tarde') ? 'theme-evening' : 'theme-default';
+
+                                  const { formatted: dateFormatted, dayName } = formatIntercambioDate(i.fecha_intercambio);
+
+                                  // Status mapping
+                                  const statusValue = i.estado || 'aprobado';
+                                  const statusLabel = statusValue.charAt(0).toUpperCase() + statusValue.slice(1);
+
+                                  return (
+                                    <tr key={i.id}>
+                                      {/* Solicitante */}
+                                      <td>
+                                        <div className="user-profile-cell-p">
+                                          <div 
+                                            className="user-avatar-circle-p"
+                                            style={{
+                                              backgroundColor: reqAvatarTheme.bg,
+                                              color: reqAvatarTheme.text
+                                            }}
+                                          >
+                                            {getInitials(reqName)}
+                                          </div>
+                                          <div className="user-profile-text-p">
+                                            <span className="user-name-value-p">{reqName}</span>
+                                            <span className="user-email-value-p">{reqRol}</span>
+                                          </div>
+                                        </div>
+                                      </td>
+
+                                      {/* Arrow Column */}
+                                      <td style={{ textAlign: 'center' }}>
+                                        <div className="swap-arrow-wrapper-p">
+                                          <ArrowLeftRight size={14} className="swap-arrow-icon-p" />
+                                        </div>
+                                      </td>
+
+                                      {/* Reemplazo */}
+                                      <td>
+                                        <div className="user-profile-cell-p">
+                                          <div 
+                                            className="user-avatar-circle-p"
+                                            style={{
+                                              backgroundColor: repAvatarTheme.bg,
+                                              color: repAvatarTheme.text
+                                            }}
+                                          >
+                                            {getInitials(repName)}
+                                          </div>
+                                          <div className="user-profile-text-p">
+                                            <span className="user-name-value-p">{repName}</span>
+                                            <span className="user-email-value-p">{repRol}</span>
+                                          </div>
+                                        </div>
+                                      </td>
+
+                                      {/* Horario Original */}
+                                      <td>
+                                        <div className="schedule-column-cell-p">
+                                          <div className={`schedule-badge-pill-p ${origThemeClass}`}>
+                                            <Clock size={12} className="schedule-badge-icon" />
+                                            <span>{hOrigName}</span>
+                                          </div>
+                                          <span className="time-range-subtext-p">{getScheduleRangeStr(i.horario_solicitante_original)}</span>
+                                        </div>
+                                      </td>
+
+                                      {/* Horario Nuevo */}
+                                      <td>
+                                        <div className="schedule-column-cell-p">
+                                          <div className={`schedule-badge-pill-p ${newThemeClass}`}>
+                                            <Clock size={12} className="schedule-badge-icon" />
+                                            <span>{hNewName}</span>
+                                          </div>
+                                          <span className="time-range-subtext-p">{getScheduleRangeStr(i.horario_reemplazo_original)}</span>
+                                        </div>
+                                      </td>
+
+                                      {/* Fecha */}
+                                      <td>
+                                        <div className="date-column-cell-p">
+                                          <span className="date-main-text-p">{dateFormatted}</span>
+                                          <span className="date-sub-text-p">{dayName}</span>
+                                        </div>
+                                      </td>
+
+                                      {/* Motivo */}
+                                      <td>
+                                        <div className="reason-column-cell-p">
+                                          <span className="reason-main-text-p">{i.motivo}</span>
+                                          <span className="reason-sub-text-p">Reg: {i.registrado_por_nombre || 'Admin'}</span>
+                                        </div>
+                                      </td>
+
+                                      {/* Estado */}
+                                      <td>
+                                        <span className={`status-pill-badge-p ${statusValue.toLowerCase()}`}>
+                                          {statusLabel}
+                                        </span>
+                                      </td>
+
+                                      {/* Acciones */}
+                                      <td>
+                                        <div className="action-buttons-cell-p">
+                                          <button
+                                            className="btn-action-delete-p"
+                                            onClick={() => handleDeleteSwap(i.id)}
+                                            title="Anular Intercambio"
+                                            type="button"
+                                          >
+                                            <Trash2 size={14} />
+                                          </button>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+
+                          {/* Pagination Footer */}
+                          <div className="table-pagination-footer-p">
+                            <span className="pagination-legend-p">
+                              Mostrando {indexOfFirstIntercambio + 1} a {Math.min(indexOfLastIntercambio, filteredIntercambios.length)} de {filteredIntercambios.length} resultados
+                            </span>
+
+                            <div className="pagination-buttons-p">
+                              <button
+                                className="btn-page-arrow-p"
+                                onClick={() => setIntercambioCurrentPage(prev => Math.max(1, prev - 1))}
+                                disabled={intercambioCurrentPage === 1}
+                                type="button"
+                              >
+                                <ChevronLeft size={14} />
+                              </button>
+                              {Array.from({ length: totalPagesIntercambio }, (_, i) => i + 1).map(page => (
                                 <button
-                                  className="btn-icon-p text-danger"
-                                  onClick={() => handleDeleteSwap(i.id)}
-                                  title="Anular Intercambio"
+                                  key={page}
+                                  className={`btn-page-number-p ${intercambioCurrentPage === page ? 'active' : ''}`}
+                                  onClick={() => setIntercambioCurrentPage(page)}
+                                  type="button"
                                 >
-                                  <Trash2 size={16} />
+                                  {page}
                                 </button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                              ))}
+                              <button
+                                className="btn-page-arrow-p"
+                                onClick={() => setIntercambioCurrentPage(prev => Math.min(totalPagesIntercambio, prev + 1))}
+                                disabled={intercambioCurrentPage === totalPagesIntercambio}
+                                type="button"
+                              >
+                                <ChevronRight size={14} />
+                              </button>
+                            </div>
+                          </div>
+                        </>
+                      )}
                     </div>
-                  )}
-                </div>
-              )}
+                  </div>
+                );
+              })()}
 
             </div>
           )}
@@ -970,15 +2042,23 @@ const GestionJornada = () => {
       )}
 
       {/* ================= MODAL: CREAR/EDITAR HORARIO ================= */}
-      {isHorarioModalOpen && (
+      {isHorarioModalOpen && createPortal(
         <div className="modal-overlay">
           {/* Modal shell: flex-column, max 90vh, no overflow */}
           <div className="hm-shell">
 
             {/* ── HEADER FIJO ── */}
             <div className="hm-header">
-              <h2>{currentHorario ? 'Editar Horario Detallado' : 'Crear Nuevo Horario'}</h2>
-              <button className="btn-icon" onClick={() => setIsHorarioModalOpen(false)}>
+              <div className="hm-header-left">
+                <div className="hm-header-icon-box">
+                  <Calendar size={20} />
+                </div>
+                <div className="hm-header-titles">
+                  <h2>{currentHorario ? 'Editar Horario Detallado' : 'Crear Nuevo Horario'}</h2>
+                  <p className="hm-header-subtitle">Configura rangos, días activos y asignación inicial del turno.</p>
+                </div>
+              </div>
+              <button className="hm-close-btn" onClick={() => setIsHorarioModalOpen(false)} title="Cerrar" type="button">
                 <X size={20} />
               </button>
             </div>
@@ -986,33 +2066,35 @@ const GestionJornada = () => {
             {/* ── BODY CON SCROLL — form semántico ocupa sólo el body ── */}
             <form id="horario-form" onSubmit={handleSaveHorario} className="hm-body">
 
-              <div className="form-group">
-                <label>Nombre del Horario/Turno *</label>
-                <input
-                  type="text"
-                  value={horarioForm.nombre}
-                  onChange={(e) => setHorarioForm(prev => ({ ...prev, nombre: e.target.value }))}
-                  required
-                  className="input-field"
-                  placeholder="Ej. Turno Mañana Flexible"
-                />
-              </div>
+              <div className="form-group-row">
+                <div className="form-group flex-1">
+                  <label className="input-label-p">Nombre del Horario/Turno *</label>
+                  <input
+                    type="text"
+                    value={horarioForm.nombre}
+                    onChange={(e) => setHorarioForm(prev => ({ ...prev, nombre: e.target.value }))}
+                    required
+                    className="input-field"
+                    placeholder="Ej. Turno Mañana Flexible"
+                  />
+                </div>
 
-              <div className="form-group">
-                <label>Descripción / Comentario</label>
-                <input
-                  type="text"
-                  value={horarioForm.descripcion}
-                  onChange={(e) => setHorarioForm(prev => ({ ...prev, descripcion: e.target.value }))}
-                  className="input-field"
-                  placeholder="Comentario sobre este turno"
-                />
+                <div className="form-group flex-1">
+                  <label className="input-label-p">Descripción / Comentario</label>
+                  <input
+                    type="text"
+                    value={horarioForm.descripcion}
+                    onChange={(e) => setHorarioForm(prev => ({ ...prev, descripcion: e.target.value }))}
+                    className="input-field"
+                    placeholder="Comentario sobre este turno"
+                  />
+                </div>
               </div>
 
               {/* SWITCH MODE */}
               <div className="schedule-mode-selector">
                 <label className="section-label-modal">¿Cómo deseas configurar este horario?</label>
-                <div className="flex gap-4 mt-2">
+                <div className="mode-cards-row">
                   <button
                     type="button"
                     className={`btn-mode-select ${!isCustomSchedule ? 'active' : ''}`}
@@ -1030,16 +2112,32 @@ const GestionJornada = () => {
                       });
                     }}
                   >
-                    <div className="font-semibold text-sm">Horario General Único</div>
-                    <small className="text-muted-p text-xs block mt-1">Mismas horas para todos los días seleccionados</small>
+                    <div className="btn-mode-radio-circle">
+                      <div className="btn-mode-radio-dot" />
+                    </div>
+                    <div className="btn-mode-icon-box">
+                      <Calendar size={18} />
+                    </div>
+                    <div className="btn-mode-content">
+                      <span className="btn-mode-title">Horario General Único</span>
+                      <span className="btn-mode-desc">Mismas horas para todos los días seleccionados</span>
+                    </div>
                   </button>
                   <button
                     type="button"
                     className={`btn-mode-select ${isCustomSchedule ? 'active' : ''}`}
                     onClick={() => setIsCustomSchedule(true)}
                   >
-                    <div className="font-semibold text-sm">Personalizado por Días</div>
-                    <small className="text-muted-p text-xs block mt-1">Configura diferentes horas por día de la semana</small>
+                    <div className="btn-mode-radio-circle">
+                      <div className="btn-mode-radio-dot" />
+                    </div>
+                    <div className="btn-mode-icon-box">
+                      <Calendar size={18} />
+                    </div>
+                    <div className="btn-mode-content">
+                      <span className="btn-mode-title">Personalizado por Días</span>
+                      <span className="btn-mode-desc">Configura diferentes horas por día de la semana</span>
+                    </div>
                   </button>
                 </div>
               </div>
@@ -1047,59 +2145,114 @@ const GestionJornada = () => {
               {/* TIMELINE EXPLANATION */}
               <div className="timeline-helper-card">
                 <div className="helper-title flex items-center gap-1.5 text-xs font-semibold text-accent mb-2">
-                  <Clock size={14} />
+                  <Info size={14} className="text-primary" />
                   ¿Cómo funcionan los rangos de marcación?
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-muted-p">
-                  <div className="helper-item">
-                    <span className="font-semibold text-success block">Rango de Entrada (Ingreso):</span>
-                    <span>Lapso en el que el empleado puede marcar entrada puntual. Si marca después del fin, se registra como <strong>Tardanza</strong>.</span>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-muted-p">
+                  <div className="helper-item flex gap-2">
+                    <LogIn size={16} className="text-primary mt-0.5" />
+                    <div>
+                      <span className="font-semibold text-success block">Rango de Entrada (Ingreso):</span>
+                      <span>Lapso en el que el empleado puede marcar entrada puntual. Si marca después del fin, se registra como <strong>Tardanza</strong>.</span>
+                    </div>
                   </div>
-                  <div className="helper-item">
-                    <span className="font-semibold text-warning block">Rango de Salida (Egreso):</span>
-                    <span>Lapso establecido para registrar la salida de la jornada diaria.</span>
+                  <div className="helper-item flex gap-2">
+                    <LogOut size={16} className="text-primary mt-0.5" />
+                    <div>
+                      <span className="font-semibold text-warning block">Rango de Salida (Egreso):</span>
+                      <span>Lapso establecido para registrar la salida de la jornada diaria.</span>
+                    </div>
                   </div>
                 </div>
               </div>
 
               {!isCustomSchedule ? (
                 <div className="unified-schedule-block">
-                  <div className="global-times-panel form-row">
-                    <div className="form-group">
-                      <label className="text-xs font-semibold text-success">Rango de Entrada de Trabajo *</label>
-                      <div className="flex gap-2 items-center mt-1">
-                        <input type="time" value={globalTimes.hora_inicio_entrada}
-                          onChange={(e) => { const val = e.target.value; setGlobalTimes(prev => ({ ...prev, hora_inicio_entrada: val })); setHorarioForm(prev => { const updated = prev.detalles.map(d => ({ ...d, hora_inicio_entrada: val })); return { ...prev, detalles: updated }; }); }}
-                          className="input-field" required step="1" />
-                        <span className="text-muted-p text-xs">a</span>
-                        <input type="time" value={globalTimes.hora_fin_entrada}
-                          onChange={(e) => { const val = e.target.value; setGlobalTimes(prev => ({ ...prev, hora_fin_entrada: val })); setHorarioForm(prev => { const updated = prev.detalles.map(d => ({ ...d, hora_fin_entrada: val })); return { ...prev, detalles: updated }; }); }}
-                          className="input-field" required step="1" />
+                  <div className="global-times-panel-grid">
+                    {/* Entrada */}
+                    <div className="global-time-card">
+                      <div className="time-card-icon-box blue">
+                        <LogIn size={20} />
                       </div>
-                      <small className="form-hint text-xs mt-1 block">Ej. Entrada puntual de 08:00:00 a 09:00:00</small>
+                      <div className="time-card-content">
+                        <label className="time-card-label">Rango de Entrada de Trabajo *</label>
+                        <div className="time-inputs-row">
+                          <div className="time-input-wrapper">
+                            <input 
+                              type="time" 
+                              value={globalTimes.hora_inicio_entrada}
+                              onChange={(e) => { const val = e.target.value; setGlobalTimes(prev => ({ ...prev, hora_inicio_entrada: val })); setHorarioForm(prev => { const updated = prev.detalles.map(d => ({ ...d, hora_inicio_entrada: val })); return { ...prev, detalles: updated }; }); }}
+                              className="input-field-time" 
+                              required 
+                              step="1" 
+                            />
+                            <Clock size={14} className="time-input-clock" />
+                          </div>
+                          <span className="time-separator">a</span>
+                          <div className="time-input-wrapper">
+                            <input 
+                              type="time" 
+                              value={globalTimes.hora_fin_entrada}
+                              onChange={(e) => { const val = e.target.value; setGlobalTimes(prev => ({ ...prev, hora_fin_entrada: val })); setHorarioForm(prev => { const updated = prev.detalles.map(d => ({ ...d, hora_fin_entrada: val })); return { ...prev, detalles: updated }; }); }}
+                              className="input-field-time" 
+                              required 
+                              step="1" 
+                            />
+                            <Clock size={14} className="time-input-clock" />
+                          </div>
+                        </div>
+                        <span className="time-card-hint">Ej. Entrada puntual de 08:00:00 a 09:00:00</span>
+                      </div>
                     </div>
-                    <div className="form-group">
-                      <label className="text-xs font-semibold text-warning">Rango de Salida de Trabajo *</label>
-                      <div className="flex gap-2 items-center mt-1">
-                        <input type="time" value={globalTimes.hora_inicio_salida}
-                          onChange={(e) => { const val = e.target.value; setGlobalTimes(prev => ({ ...prev, hora_inicio_salida: val })); setHorarioForm(prev => { const updated = prev.detalles.map(d => ({ ...d, hora_inicio_salida: val })); return { ...prev, detalles: updated }; }); }}
-                          className="input-field" required step="1" />
-                        <span className="text-muted-p text-xs">a</span>
-                        <input type="time" value={globalTimes.hora_fin_salida}
-                          onChange={(e) => { const val = e.target.value; setGlobalTimes(prev => ({ ...prev, hora_fin_salida: val })); setHorarioForm(prev => { const updated = prev.detalles.map(d => ({ ...d, hora_fin_salida: val })); return { ...prev, detalles: updated }; }); }}
-                          className="input-field" required step="1" />
+
+                    {/* Salida */}
+                    <div className="global-time-card">
+                      <div className="time-card-icon-box blue">
+                        <LogOut size={20} />
                       </div>
-                      <small className="form-hint text-xs mt-1 block">Ej. Salida de 17:00:00 a 19:00:00</small>
+                      <div className="time-card-content">
+                        <label className="time-card-label">Rango de Salida de Trabajo *</label>
+                        <div className="time-inputs-row">
+                          <div className="time-input-wrapper">
+                            <input 
+                              type="time" 
+                              value={globalTimes.hora_inicio_salida}
+                              onChange={(e) => { const val = e.target.value; setGlobalTimes(prev => ({ ...prev, hora_inicio_salida: val })); setHorarioForm(prev => { const updated = prev.detalles.map(d => ({ ...d, hora_inicio_salida: val })); return { ...prev, detalles: updated }; }); }}
+                              className="input-field-time" 
+                              required 
+                              step="1" 
+                            />
+                            <Clock size={14} className="time-input-clock" />
+                          </div>
+                          <span className="time-separator">a</span>
+                          <div className="time-input-wrapper">
+                            <input 
+                              type="time" 
+                              value={globalTimes.hora_fin_salida}
+                              onChange={(e) => { const val = e.target.value; setGlobalTimes(prev => ({ ...prev, hora_fin_salida: val })); setHorarioForm(prev => { const updated = prev.detalles.map(d => ({ ...d, hora_fin_salida: val })); return { ...prev, detalles: updated }; }); }}
+                              className="input-field-time" 
+                              required 
+                              step="1" 
+                            />
+                            <Clock size={14} className="time-input-clock" />
+                          </div>
+                        </div>
+                        <span className="time-card-hint">Ej. Salida de 17:00:00 a 19:00:00</span>
+                      </div>
                     </div>
                   </div>
 
                   <div className="form-group">
-                    <label className="section-label-modal">Selecciona los días activos para este turno:</label>
+                    <label className="section-label-modal">Selecciona los días activos para este turno</label>
                     <div className="flex flex-wrap gap-2 mt-2">
                       {horarioForm.detalles.map((d, index) => (
-                        <button key={d.dia_semana} type="button"
+                        <button 
+                          key={d.dia_semana} 
+                          type="button"
                           className={`day-selector-btn-pill capitalize ${d.activo ? 'active' : ''}`}
-                          onClick={() => handleDayToggle(index)}>
+                          onClick={() => handleDayToggle(index)}
+                        >
+                          {d.activo && <Check size={14} className="day-check-icon" />}
                           <span className="capitalize">{d.dia_semana}</span>
                         </button>
                       ))}
@@ -1108,38 +2261,90 @@ const GestionJornada = () => {
                 </div>
               ) : (
                 <div className="custom-schedule-block">
-                  <label className="section-label-modal">Configura horas individuales por día:</label>
+                  <label className="section-label-modal">Configura horas individuales por día</label>
                   <div className="days-configs-grid mt-2">
-                    {horarioForm.detalles.map((d, index) => (
-                      <div key={d.dia_semana} className={`day-config-card ${d.activo ? 'active' : ''}`}>
-                        <div className="day-card-header">
-                          <label className="checkbox-label flex items-center gap-2">
-                            <input type="checkbox" checked={d.activo} onChange={() => handleDayToggle(index)} />
-                            <span className="capitalize font-semibold">{d.dia_semana}</span>
-                          </label>
-                        </div>
-                        {d.activo && (
-                          <div className="day-card-times mt-3">
+                    {horarioForm.detalles.map((d, index) => {
+                      const isDomingo = d.dia_semana.toLowerCase() === 'domingo';
+                      return (
+                        <div key={d.dia_semana} className={`day-config-card ${d.activo ? 'active' : ''} ${isDomingo ? 'domingo-card' : ''}`}>
+                          <div className="day-card-header">
+                            <label className="checkbox-label flex items-center gap-2">
+                              <input 
+                                type="checkbox" 
+                                checked={d.activo} 
+                                onChange={() => handleDayToggle(index)} 
+                                className="day-card-checkbox"
+                              />
+                              <span className="capitalize font-semibold">{d.dia_semana}</span>
+                            </label>
+                          </div>
+                          
+                          <div className={`day-card-times mt-3 ${isDomingo ? 'domingo-times-row' : ''}`}>
                             <div className="time-group">
-                              <label>Entrada Rango</label>
-                              <div className="flex gap-1 items-center">
-                                <input type="time" value={d.hora_inicio_entrada} onChange={(e) => handleTimeChange(index, 'hora_inicio_entrada', e.target.value)} className="input-field-sm" required step="1" />
-                                <span>a</span>
-                                <input type="time" value={d.hora_fin_entrada} onChange={(e) => handleTimeChange(index, 'hora_fin_entrada', e.target.value)} className="input-field-sm" required step="1" />
+                              <label className="time-group-label">Entrada Rango</label>
+                              <div className="time-inputs-row-sm">
+                                <div className="time-input-wrapper-sm">
+                                  <input 
+                                    type="time" 
+                                    value={d.activo ? d.hora_inicio_entrada : ''} 
+                                    onChange={(e) => handleTimeChange(index, 'hora_inicio_entrada', e.target.value)} 
+                                    className="input-field-time-sm" 
+                                    disabled={!d.activo}
+                                    required={d.activo} 
+                                    step="1" 
+                                  />
+                                  <Clock size={12} className="time-input-clock-sm" />
+                                </div>
+                                <span className="time-separator-sm">a</span>
+                                <div className="time-input-wrapper-sm">
+                                  <input 
+                                    type="time" 
+                                    value={d.activo ? d.hora_fin_entrada : ''} 
+                                    onChange={(e) => handleTimeChange(index, 'hora_fin_entrada', e.target.value)} 
+                                    className="input-field-time-sm" 
+                                    disabled={!d.activo}
+                                    required={d.activo} 
+                                    step="1" 
+                                  />
+                                  <Clock size={12} className="time-input-clock-sm" />
+                                </div>
                               </div>
                             </div>
-                            <div className="time-group mt-2">
-                              <label>Salida Rango</label>
-                              <div className="flex gap-1 items-center">
-                                <input type="time" value={d.hora_inicio_salida} onChange={(e) => handleTimeChange(index, 'hora_inicio_salida', e.target.value)} className="input-field-sm" required step="1" />
-                                <span>a</span>
-                                <input type="time" value={d.hora_fin_salida} onChange={(e) => handleTimeChange(index, 'hora_fin_salida', e.target.value)} className="input-field-sm" required step="1" />
+                            
+                            <div className={`time-group ${isDomingo ? '' : 'mt-3'}`}>
+                              <label className="time-group-label">Salida Rango</label>
+                              <div className="time-inputs-row-sm">
+                                <div className="time-input-wrapper-sm">
+                                  <input 
+                                    type="time" 
+                                    value={d.activo ? d.hora_inicio_salida : ''} 
+                                    onChange={(e) => handleTimeChange(index, 'hora_inicio_salida', e.target.value)} 
+                                    className="input-field-time-sm" 
+                                    disabled={!d.activo}
+                                    required={d.activo} 
+                                    step="1" 
+                                  />
+                                  <Clock size={12} className="time-input-clock-sm" />
+                                </div>
+                                <span className="time-separator-sm">a</span>
+                                <div className="time-input-wrapper-sm">
+                                  <input 
+                                    type="time" 
+                                    value={d.activo ? d.hora_fin_salida : ''} 
+                                    onChange={(e) => handleTimeChange(index, 'hora_fin_salida', e.target.value)} 
+                                    className="input-field-time-sm" 
+                                    disabled={!d.activo}
+                                    required={d.activo} 
+                                    step="1" 
+                                  />
+                                  <Clock size={12} className="time-input-clock-sm" />
+                                </div>
                               </div>
                             </div>
                           </div>
-                        )}
-                      </div>
-                    ))}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -1147,34 +2352,48 @@ const GestionJornada = () => {
               {/* Asignación opcional al crear */}
               {!currentHorario && (
                 <div className="assignment-section-modal">
-                  <h4 className="section-label-modal">Asignar Inmediatamente a Usuarios (Opcional)</h4>
+                  <h4 className="section-label-modal">Asignar inmediatamente a usuarios (opcional)</h4>
                   <p className="text-muted-p text-sm">Selecciona uno o más usuarios de la sede para asignarles este nuevo horario.</p>
                   {usuariosSede.length === 0 ? (
                     <p className="text-warning text-sm mt-2">No hay usuarios de rol Operador/Asesor en esta sede para asignar.</p>
                   ) : (
                     <>
                       <div className="user-search-wrapper mt-3 mb-2">
-                        <input type="text" className="input-field text-sm"
-                          placeholder="🔍 Buscar usuarios por nombre..."
+                        <Search size={14} className="user-search-icon" />
+                        <input 
+                          type="text" 
+                          className="user-search-input-modal"
+                          placeholder="Buscar usuarios por nombre..."
                           value={userSearchTerm}
-                          onChange={(e) => setUserSearchTerm(e.target.value)} />
+                          onChange={(e) => setUserSearchTerm(e.target.value)} 
+                        />
                       </div>
                       <div className="users-select-checklist-scroll mt-2">
                         {usuariosSede
                           .filter(u => u.nombre_completo.toLowerCase().includes(userSearchTerm.toLowerCase()))
                           .map(u => {
                             const isSelected = horarioForm.usuarios_asignados.includes(u.id);
+                            const avatarTheme = getAvatarTheme(u.nombre_completo);
                             return (
                               <label key={u.id} className={`user-select-row-p ${isSelected ? 'selected' : ''}`}>
                                 <input
                                   type="checkbox"
                                   checked={isSelected}
                                   onChange={() => handleToggleUserSelect(u.id)}
-                                  className="mr-2"
+                                  className="user-select-checkbox-p"
                                 />
-                                <div className="flex flex-col">
-                                  <span className="font-semibold text-sm">{u.nombre_completo}</span>
-                                  <span className="text-xs text-muted-p capitalize">{u.rol_info?.nombre || u.rol?.nombre || u.cargo || 'Operador'}</span>
+                                <div 
+                                  className="user-avatar-circle-sm-p"
+                                  style={{
+                                    backgroundColor: avatarTheme.bg,
+                                    color: avatarTheme.text
+                                  }}
+                                >
+                                  {getInitials(u.nombre_completo)}
+                                </div>
+                                <div className="user-select-info-p">
+                                  <span className="user-select-name-p">{u.nombre_completo}</span>
+                                  <span className="user-select-role-p">{u.rol_info?.nombre || u.rol?.nombre || u.cargo || 'Operador'}</span>
                                 </div>
                               </label>
                             );
@@ -1182,17 +2401,30 @@ const GestionJornada = () => {
                       </div>
                       {horarioForm.usuarios_asignados.length > 0 && (
                         <div className="form-row mt-4">
-                          <div className="form-group">
-                            <label>Vigente Desde *</label>
-                            <input type="date" value={horarioForm.vigente_desde}
-                              onChange={(e) => setHorarioForm(prev => ({ ...prev, vigente_desde: e.target.value }))}
-                              required className="input-field" />
+                          <div className="form-group flex-1">
+                            <label className="input-label-p">Vigente Desde *</label>
+                            <div className="date-input-wrapper-custom">
+                              <Calendar size={16} className="date-input-icon" />
+                              <input 
+                                type="date" 
+                                value={horarioForm.vigente_desde}
+                                onChange={(e) => setHorarioForm(prev => ({ ...prev, vigente_desde: e.target.value }))}
+                                required 
+                                className="input-field-date-custom" 
+                              />
+                            </div>
                           </div>
-                          <div className="form-group">
-                            <label>Vigente Hasta</label>
-                            <input type="date" value={horarioForm.vigente_hasta}
-                              onChange={(e) => setHorarioForm(prev => ({ ...prev, vigente_hasta: e.target.value }))}
-                              className="input-field" />
+                          <div className="form-group flex-1">
+                            <label className="input-label-p">Vigente Hasta</label>
+                            <div className="date-input-wrapper-custom">
+                              <Calendar size={16} className="date-input-icon" />
+                              <input 
+                                type="date" 
+                                value={horarioForm.vigente_hasta}
+                                onChange={(e) => setHorarioForm(prev => ({ ...prev, vigente_hasta: e.target.value }))}
+                                className="input-field-date-custom" 
+                              />
+                            </div>
                           </div>
                         </div>
                       )}
@@ -1201,124 +2433,379 @@ const GestionJornada = () => {
                 </div>
               )}
 
+              {/* Si ya está creado (Modo Edición) y tiene usuarios asignados, permitimos editar las fechas de vigencia sin mostrar la lista de usuarios */}
+              {currentHorario && horarioForm.usuarios_asignados.length > 0 && (
+                <div className="assignment-section-modal mt-4">
+                  <h4 className="section-label-modal">Vigencia del Horario</h4>
+                  <p className="text-muted-p text-sm">Modifica el rango de fechas en el que estará vigente este horario para los usuarios que lo tienen asignado actualmente.</p>
+                  <div className="form-row mt-3">
+                    <div className="form-group flex-1">
+                      <label className="input-label-p">Vigente Desde *</label>
+                      <div className="date-input-wrapper-custom">
+                        <Calendar size={16} className="date-input-icon" />
+                        <input 
+                          type="date" 
+                          value={horarioForm.vigente_desde}
+                          onChange={(e) => setHorarioForm(prev => ({ ...prev, vigente_desde: e.target.value }))}
+                          required 
+                          className="input-field-date-custom" 
+                        />
+                      </div>
+                    </div>
+                    <div className="form-group flex-1">
+                      <label className="input-label-p">Vigente Hasta</label>
+                      <div className="date-input-wrapper-custom">
+                        <Calendar size={16} className="date-input-icon" />
+                        <input 
+                          type="date" 
+                          value={horarioForm.vigente_hasta}
+                          onChange={(e) => setHorarioForm(prev => ({ ...prev, vigente_hasta: e.target.value }))}
+                          className="input-field-date-custom" 
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
             </form>
 
             {/* ── FOOTER FIJO — fuera del form, usa form="horario-form" ── */}
             <div className="hm-footer">
-              <button type="button" className="btn btn-secondary" onClick={() => setIsHorarioModalOpen(false)}>
+              <button type="button" className="btn-modal-footer-cancel" onClick={() => setIsHorarioModalOpen(false)}>
                 Cancelar
               </button>
-              <button type="submit" form="horario-form" className="btn btn-primary">
-                {currentHorario ? 'Guardar Cambios' : 'Crear y Asignar'}
+              <button type="submit" form="horario-form" className="btn-modal-footer-submit">
+                <UserPlus size={16} />
+                <span>{currentHorario ? 'Guardar Cambios' : 'Crear y Asignar'}</span>
               </button>
             </div>
 
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ================= MODAL: ASIGNAR HORARIO EXISTENTE ================= */}
-      {isAssignModalOpen && (
+      {isAssignModalOpen && createPortal(
         <div className="modal-overlay">
-          <div className="modal-content">
-            <div className="modal-header">
-              <h2>Asignar Horario</h2>
-              <button className="btn-icon" onClick={() => setIsAssignModalOpen(false)}>
-                <X size={24} />
+          <div className="hm-shell">
+            {/* Header Fijo */}
+            <div className="hm-header">
+              <div className="hm-header-left">
+                <div className="hm-header-icon-box">
+                  <Calendar size={24} />
+                  <div className="hm-header-icon-badge">
+                    <User size={10} />
+                  </div>
+                </div>
+                <div className="hm-header-titles">
+                  <h2>Asignar Horario</h2>
+                  <p className="hm-header-subtitle">Selecciona el turno, define la vigencia y asigna los usuarios que tendrán este horario.</p>
+                </div>
+              </div>
+              <button className="hm-close-btn" onClick={() => setIsAssignModalOpen(false)} title="Cerrar" type="button">
+                <X size={20} />
               </button>
             </div>
 
-            <form onSubmit={handleSaveAssignment} className="modal-form">
-              <div className="form-group">
-                <label>Horario/Turno a asignar *</label>
-                <select
-                  value={assignForm.horario}
-                  onChange={(e) => setAssignForm(prev => ({ ...prev, horario: e.target.value }))}
-                  required
-                  className="input-field"
+            {/* Body con Scroll */}
+            <form id="assign-form" onSubmit={handleSaveAssignment} className="hm-body">
+              {/* Campo Desplegable de Horario */}
+              <div className="form-group position-relative" ref={horarioDropdownRef}>
+                <label className="input-label-p">Horario/Turno a asignar *</label>
+                
+                <div 
+                  className={`dropdown-select-custom ${isHorarioDropdownOpen ? 'open' : ''} ${!assignForm.horario ? 'placeholder' : ''}`}
+                  onClick={() => setIsHorarioDropdownOpen(prev => !prev)}
                 >
-                  <option value="" disabled>Seleccione un horario</option>
-                  {horarios.map(h => (
-                    <option key={h.id} value={h.id}>{h.nombre}</option>
-                  ))}
-                </select>
-              </div>
+                  <div className="dropdown-select-trigger-content">
+                    <Calendar size={16} className="dropdown-trigger-icon-blue" />
+                    {assignForm.horario ? (
+                      (() => {
+                        const selectedH = horarios.find(h => h.id === parseInt(assignForm.horario));
+                        if (!selectedH) return <span>Seleccione un horario</span>;
+                        return (
+                          <div className="selected-option-summary">
+                            <span className="selected-option-title">{selectedH.nombre}</span>
+                            <span className="selected-option-subtext">{getHorarioSummary(selectedH)}</span>
+                          </div>
+                        );
+                      })()
+                    ) : (
+                      <span>Seleccione un horario</span>
+                    )}
+                  </div>
+                  <ChevronDown size={16} className="dropdown-trigger-chevron" />
+                </div>
 
-              <div className="form-group">
-                <label>Seleccionar Usuarios *</label>
-                <div className="users-select-checklist mt-2 max-h-48 overflow-y-auto border p-2 rounded">
-                  {usuariosSede.map(u => {
-                    const isSelected = assignForm.usuarios.includes(u.id);
-                    return (
-                      <div
-                        key={u.id}
-                        className={`user-select-row-p ${isSelected ? 'selected' : ''}`}
-                        onClick={() => handleToggleAssignUser(u.id)}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          readOnly
-                          className="mr-2"
-                        />
-                        <div className="flex flex-col">
-                          <span className="font-medium text-sm">{u.nombre_completo}</span>
-                          <span className="text-xs text-muted-p capitalize">{u.rol_info?.nombre || u.rol?.nombre || u.cargo || 'Operador'}</span>
-                        </div>
+                {isHorarioDropdownOpen && (
+                  <div className="dropdown-menu-custom">
+                    {horarios.length === 0 ? (
+                      <div className="dropdown-empty-state">
+                        <p>No hay horarios creados para esta sede.</p>
                       </div>
-                    );
-                  })}
+                    ) : (
+                      horarios.map(h => {
+                        const countAssigned = usuariosConHorario.filter(uh => uh.horario === h.id).length;
+                        const isSelected = parseInt(assignForm.horario) === h.id;
+                        return (
+                          <div 
+                            key={h.id} 
+                            className={`dropdown-option-custom ${isSelected ? 'selected' : ''}`}
+                            onClick={() => {
+                              setAssignForm(prev => ({ ...prev, horario: h.id }));
+                              setIsHorarioDropdownOpen(false);
+                            }}
+                          >
+                            <div className="option-main-info">
+                              <span className="option-title">{h.nombre}</span>
+                              {countAssigned > 0 ? (
+                                <span className="option-badge-assigned">{countAssigned} {countAssigned === 1 ? 'usuario' : 'usuarios'}</span>
+                              ) : (
+                                <span className="option-badge-empty">Sin usuarios</span>
+                              )}
+                            </div>
+                            <span className="option-subtext">{getHorarioSummary(h)}</span>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Campo Multiselect de Usuarios */}
+              <div className="form-group position-relative" ref={userDropdownRef}>
+                <label className="input-label-p">Seleccionar Usuarios *</label>
+
+                <div 
+                  className={`multiselect-trigger-custom ${isUserDropdownOpen ? 'open' : ''}`}
+                  onClick={(e) => {
+                    if (e.target.closest('.chip-delete-btn')) return;
+                    setIsUserDropdownOpen(prev => !prev);
+                  }}
+                >
+                  <Users size={16} className="dropdown-trigger-icon-blue" />
+                  <div className="multiselect-chips-and-input">
+                    {(() => {
+                      const maxChipsToShow = 2;
+                      const selectedUsers = usuariosSede.filter(u => assignForm.usuarios.includes(u.id));
+                      const displayedChips = selectedUsers.slice(0, maxChipsToShow);
+                      const hiddenCount = selectedUsers.length - displayedChips.length;
+                      
+                      return (
+                        <>
+                          {displayedChips.map(u => {
+                            const avatarTheme = getAvatarTheme(u.nombre_completo);
+                            return (
+                              <span 
+                                key={u.id} 
+                                className="user-chip-custom"
+                                style={{
+                                  backgroundColor: avatarTheme.bg,
+                                  color: avatarTheme.text,
+                                  borderColor: avatarTheme.text + '20'
+                                }}
+                              >
+                                <div 
+                                  className="chip-avatar-circle"
+                                  style={{
+                                    backgroundColor: avatarTheme.text,
+                                    color: '#ffffff'
+                                  }}
+                                >
+                                  {getInitials(u.nombre_completo)}
+                                </div>
+                                <span className="chip-text-name">{u.nombre_completo.split(' ')[0]} {u.nombre_completo.split(' ')[1] || ''}</span>
+                                <button 
+                                  type="button" 
+                                  className="chip-delete-btn"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleToggleAssignUser(u.id);
+                                  }}
+                                  style={{
+                                    color: avatarTheme.text
+                                  }}
+                                >
+                                  <X size={10} />
+                                </button>
+                              </span>
+                            );
+                          })}
+                          {hiddenCount > 0 && (
+                            <span className="user-chip-more-custom">+{hiddenCount} más</span>
+                          )}
+                          {assignForm.usuarios.length === 0 && (
+                            <span className="multiselect-placeholder-text">Buscar y seleccionar usuarios</span>
+                          )}
+                        </>
+                      );
+                    })()}
+                  </div>
+                  <ChevronDown size={16} className="dropdown-trigger-chevron" />
+                </div>
+
+                {isUserDropdownOpen && (
+                  <div className="dropdown-menu-custom user-dropdown-menu">
+                    <div className="dropdown-search-container" onClick={(e) => e.stopPropagation()}>
+                      <Search size={14} className="dropdown-search-icon" />
+                      <input 
+                        type="text"
+                        className="search-input-dropdown"
+                        placeholder="Buscar por nombre o rol"
+                        value={userSearchDropdownTerm}
+                        onChange={(e) => setUserSearchDropdownTerm(e.target.value)}
+                      />
+                      {userSearchDropdownTerm && (
+                        <button 
+                          type="button" 
+                          className="clear-search-btn"
+                          onClick={() => setUserSearchDropdownTerm('')}
+                        >
+                          <X size={12} />
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="user-options-list-scroll">
+                      {(() => {
+                        const filtered = usuariosSede.filter(u => {
+                          const query = userSearchDropdownTerm.toLowerCase();
+                          const nameMatch = u.nombre_completo.toLowerCase().includes(query);
+                          const rolName = (u.rol_info?.nombre || u.rol?.nombre || u.cargo || 'Operador').toLowerCase();
+                          const rolMatch = rolName.includes(query);
+                          return nameMatch || rolMatch;
+                        });
+
+                        if (filtered.length === 0) {
+                          return (
+                            <div className="dropdown-empty-state-users">
+                              <p>No hay usuarios disponibles.</p>
+                            </div>
+                          );
+                        }
+
+                        return filtered.map(u => {
+                          const isSelected = assignForm.usuarios.includes(u.id);
+                          const avatarTheme = getAvatarTheme(u.nombre_completo);
+                          const hasConflict = checkScheduleConflict(
+                            u.id,
+                            assignForm.horario,
+                            assignForm.vigente_desde,
+                            assignForm.vigente_hasta
+                          );
+
+                          return (
+                            <div 
+                              key={u.id}
+                              className={`user-option-row ${isSelected ? 'selected' : ''} ${hasConflict ? 'has-conflict-row' : ''}`}
+                              onClick={() => handleToggleAssignUser(u.id)}
+                            >
+                              <div className="user-option-left">
+                                <input 
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  readOnly
+                                  className="user-option-checkbox"
+                                />
+                                <div 
+                                  className="user-option-avatar"
+                                  style={{
+                                    backgroundColor: avatarTheme.bg,
+                                    color: avatarTheme.text
+                                  }}
+                                >
+                                  {getInitials(u.nombre_completo)}
+                                </div>
+                                <div className="user-option-info">
+                                  <span className="user-option-name">{u.nombre_completo}</span>
+                                </div>
+                              </div>
+                              
+                              <div className="user-option-right">
+                                {hasConflict ? (
+                                  <span className="conflict-warning-badge" title={`Conflicto con '${hasConflict.horario.nombre}'`}>
+                                    Tiene horario en conflicto
+                                  </span>
+                                ) : (
+                                  <span className="user-option-role-badge">
+                                    {u.rol_info?.nombre || u.rol?.nombre || u.cargo || 'Operador'}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        });
+                      })()}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Fechas de Vigencia en Dos Columnas */}
+              <div className="form-group-row">
+                <div className="form-group flex-1">
+                  <label className="input-label-p">Vigente Desde *</label>
+                  <div className="date-input-wrapper-custom">
+                    <Calendar size={16} className="date-input-icon" />
+                    <input
+                      type="date"
+                      value={assignForm.vigente_desde}
+                      onChange={(e) => setAssignForm(prev => ({ ...prev, vigente_desde: e.target.value }))}
+                      required
+                      className="input-field-date-custom"
+                    />
+                  </div>
+                </div>
+                <div className="form-group flex-1">
+                  <label className="input-label-p">Vigente Hasta</label>
+                  <div className="date-input-wrapper-custom">
+                    <Calendar size={16} className="date-input-icon" />
+                    <input
+                      type="date"
+                      value={assignForm.vigente_hasta}
+                      onChange={(e) => setAssignForm(prev => ({ ...prev, vigente_hasta: e.target.value }))}
+                      className="input-field-date-custom"
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div className="form-row mt-3">
-                <div className="form-group w-full md:w-1/2">
-                  <label>Vigente Desde *</label>
-                  <input
-                    type="date"
-                    value={assignForm.vigente_desde}
-                    onChange={(e) => setAssignForm(prev => ({ ...prev, vigente_desde: e.target.value }))}
-                    required
-                    className="input-field"
+              {/* Observación */}
+              <div className="form-group">
+                <label className="input-label-p">Observación</label>
+                <div className="observation-input-wrapper">
+                  <FileText size={16} className="observation-input-icon" />
+                  <textarea
+                    value={assignForm.observacion}
+                    onChange={(e) => setAssignForm(prev => ({ ...prev, observacion: e.target.value }))}
+                    className="input-field-obs"
+                    rows={1}
+                    placeholder="Agrega una observación (opcional)"
                   />
                 </div>
-                <div className="form-group w-full md:w-1/2">
-                  <label>Vigente Hasta</label>
-                  <input
-                    type="date"
-                    value={assignForm.vigente_hasta}
-                    onChange={(e) => setAssignForm(prev => ({ ...prev, vigente_hasta: e.target.value }))}
-                    className="input-field"
-                  />
-                </div>
-              </div>
-
-              <div className="form-group mt-3">
-                <label>Observación</label>
-                <input
-                  type="text"
-                  value={assignForm.observacion}
-                  onChange={(e) => setAssignForm(prev => ({ ...prev, observacion: e.target.value }))}
-                  className="input-field"
-                  placeholder="Detalle de asignación"
-                />
-              </div>
-
-              <div className="modal-footer mt-6">
-                <button type="button" className="btn btn-secondary" onClick={() => setIsAssignModalOpen(false)}>
-                  Cancelar
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  Confirmar Asignación
-                </button>
               </div>
             </form>
+
+            {/* Footer Fijo */}
+            <div className="hm-footer">
+              <button type="button" className="btn-modal-footer-cancel" onClick={() => setIsAssignModalOpen(false)}>
+                Cancelar
+              </button>
+              <button type="submit" form="assign-form" className="btn-modal-footer-submit-blue">
+                <Check size={16} className="btn-submit-check-icon" />
+                <span>Confirmar Asignación</span>
+              </button>
+            </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ================= MODAL: REGISTRAR INTERCAMBIO ================= */}
-      {isSwapModalOpen && (
+      {isSwapModalOpen && createPortal(
         <div className="modal-overlay">
           <div className="modal-content">
             <div className="modal-header">
@@ -1336,15 +2823,25 @@ const GestionJornada = () => {
                   onChange={(e) => setSwapForm(prev => ({
                     ...prev,
                     usuario_solicitante: e.target.value,
-                    usuario_reemplazo: prev.usuario_reemplazo === e.target.value ? '' : prev.usuario_reemplazo
+                    usuario_reemplazo: ''
                   }))}
                   required
                   className="input-field"
                 >
                   <option value="" disabled>Seleccione al solicitante</option>
-                  {usuariosSede.map(u => (
-                    <option key={u.id} value={u.id}>{u.nombre_completo} ({u.rol_info?.nombre || u.rol?.nombre || u.cargo || 'Operador'})</option>
-                  ))}
+                  {usuariosSede
+                    .filter(u => getUserAssignedSchedule(u.id) !== null)
+                    .map(u => {
+                      const sched = getUserAssignedSchedule(u.id);
+                      const horarioName = sched ? sched.horario.nombre : '';
+                      const hours = sched ? ` (${sched.detail.hora_inicio_entrada.substring(0,5)} - ${sched.detail.hora_fin_salida.substring(0,5)})` : '';
+                      return (
+                        <option key={u.id} value={u.id}>
+                          {u.nombre_completo} ({u.rol_info?.nombre || u.rol?.nombre || u.cargo || 'Operador'}) - {horarioName}{hours}
+                        </option>
+                      );
+                    })
+                  }
                 </select>
               </div>
 
@@ -1358,24 +2855,49 @@ const GestionJornada = () => {
                   disabled={!swapForm.usuario_solicitante}
                 >
                   <option value="" disabled>Seleccione al reemplazo</option>
-                  {usuariosSede
-                    .filter(u => u.id !== parseInt(swapForm.usuario_solicitante))
-                    .map(u => (
-                      <option key={u.id} value={u.id}>{u.nombre_completo} ({u.rol_info?.nombre || u.rol?.nombre || u.cargo || 'Operador'})</option>
-                    ))
-                  }
+                  {(() => {
+                    const solicitanteId = parseInt(swapForm.usuario_solicitante);
+                    if (!solicitanteId) return null;
+                    
+                    const schedA = getUserAssignedSchedule(solicitanteId);
+                    if (!schedA) return null;
+                    
+                    return usuariosSede
+                      .filter(u => u.id !== solicitanteId)
+                      .filter(u => {
+                        const schedB = getUserAssignedSchedule(u.id);
+                        if (!schedB) return false; // Both must have a schedule to swap!
+                        
+                        // They must have different schedules to swap
+                        return schedB.horario.id !== schedA.horario.id;
+                      })
+                      .map(u => {
+                        const schedB = getUserAssignedSchedule(u.id);
+                        const labelText = schedB 
+                          ? ` - ${schedB.horario.nombre} (${schedB.detail.hora_inicio_entrada.substring(0,5)} - ${schedB.detail.hora_fin_salida.substring(0,5)})`
+                          : '';
+                        return (
+                          <option key={u.id} value={u.id}>
+                            {u.nombre_completo} ({u.rol_info?.nombre || u.rol?.nombre || u.cargo || 'Operador'}){labelText}
+                          </option>
+                        );
+                      });
+                  })()}
                 </select>
               </div>
 
               <div className="form-group mt-3">
                 <label>Fecha de Intercambio *</label>
-                <input
-                  type="date"
-                  value={swapForm.fecha_intercambio}
-                  onChange={(e) => setSwapForm(prev => ({ ...prev, fecha_intercambio: e.target.value }))}
-                  required
-                  className="input-field"
-                />
+                <div className="date-input-wrapper-custom">
+                  <Calendar size={16} className="date-input-icon" />
+                  <input
+                    type="date"
+                    value={swapForm.fecha_intercambio}
+                    onChange={(e) => setSwapForm(prev => ({ ...prev, fecha_intercambio: e.target.value }))}
+                    required
+                    className="input-field-date-custom"
+                  />
+                </div>
               </div>
 
               <div className="form-group mt-3">
@@ -1411,7 +2933,8 @@ const GestionJornada = () => {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
     </MainLayout>

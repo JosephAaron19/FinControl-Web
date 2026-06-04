@@ -1,178 +1,69 @@
-.login-container {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  overflow: hidden;
-  padding: 1rem;
+/* Custom premium animations for FinControl Login SaaS view */
+
+@keyframes float-slow {
+  0%, 100% {
+    transform: translateY(0px) scale(1);
+  }
+  50% {
+    transform: translateY(-8px) scale(1.01);
+  }
 }
 
-/* Background Glowing Circles */
-.glow-circle {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(100px);
-  z-index: 0;
-  opacity: 0.5;
+@keyframes float-medium {
+  0%, 100% {
+    transform: translateY(0px) scale(1);
+  }
+  50% {
+    transform: translateY(-12px) scale(0.99);
+  }
 }
 
-.circle-1 {
-  width: 400px;
-  height: 400px;
-  background-color: rgba(16, 185, 129, 0.2); /* Primary green */
-  top: -100px;
-  right: -100px;
-  animation: float 10s ease-in-out infinite alternate;
+@keyframes float-fast {
+  0%, 100% {
+    transform: translateY(0px) scale(1);
+  }
+  50% {
+    transform: translateY(-6px) scale(1.005);
+  }
 }
 
-.circle-2 {
-  width: 500px;
-  height: 500px;
-  background-color: rgba(59, 130, 246, 0.15); /* Secondary blue */
-  bottom: -150px;
-  left: -150px;
-  animation: float 12s ease-in-out infinite alternate-reverse;
-}
-
-@keyframes float {
+@keyframes pulse-ring {
   0% {
-    transform: translateY(0) scale(1);
+    transform: scale(0.95);
+    opacity: 0.3;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.6;
   }
   100% {
-    transform: translateY(30px) scale(1.05);
+    transform: scale(0.95);
+    opacity: 0.3;
   }
 }
 
-.login-content {
-  position: relative;
-  z-index: 1;
-  width: 100%;
-  max-width: 420px;
-  display: flex;
-  flex-direction: column;
-  gap: 2rem;
+@keyframes dash {
+  to {
+    stroke-dashoffset: -20;
+  }
 }
 
-.login-header {
-  text-align: center;
+.animate-float-slow {
+  animation: float-slow 6s ease-in-out infinite;
 }
 
-.logo-container {
-  width: 80px;
-  height: 80px;
-  background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
-  border-radius: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0 auto 1.5rem;
-  box-shadow: var(--shadow-glow);
-  color: white;
+.animate-float-medium {
+  animation: float-medium 7s ease-in-out infinite;
 }
 
-.login-header h1 {
-  font-size: 2rem;
-  font-weight: 700;
-  margin-bottom: 0.5rem;
-  background: linear-gradient(to right, #f8fafc, #cbd5e1);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+.animate-float-fast {
+  animation: float-fast 5s ease-in-out infinite;
 }
 
-.subtitle {
-  color: var(--color-text-muted);
-  font-size: 1.1rem;
+.animate-pulse-ring {
+  animation: pulse-ring 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
-.login-card {
-  padding: 2.5rem;
-  background-color: rgba(30, 41, 59, 0.7);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.form-group {
-  margin-bottom: 1.5rem;
-}
-
-.password-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.5rem;
-}
-
-.password-header .input-label {
-  margin-bottom: 0;
-}
-
-
-
-.input-wrapper {
-  position: relative;
-  display: flex;
-  align-items: center;
-  width: 100%;
-}
-
-.input-icon {
-  position: absolute;
-  left: 1rem;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--color-text-muted);
-  pointer-events: none;
-  z-index: 10;
-  transition: color 0.2s;
-}
-
-.input-field.with-icon {
-  padding-left: 3.5rem !important;
-}
-
-.input-field.with-right-icon {
-  padding-right: 3.5rem !important;
-}
-
-.input-field:focus + .input-icon,
-.input-wrapper:focus-within .input-icon {
-  color: var(--color-primary);
-}
-
-.login-btn {
-  width: 100%;
-  margin-top: 1rem;
-  height: 3rem;
-}
-
-.footer-text {
-  text-align: center;
-  color: var(--color-text-muted);
-  font-size: 0.875rem;
-}
-
-.password-toggle {
-  position: absolute;
-  right: 1.25rem;
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: var(--color-text-muted);
-  padding: 0.25rem;
-  display: flex;
-  align-items: center;
-  z-index: 10;
-  transition: all 0.2s;
-}
-
-.password-toggle:hover {
-  color: var(--color-primary);
-  transform: scale(1.1);
-}
-
-.input-field:focus {
-  background-color: rgba(15, 23, 42, 0.9);
-  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1), var(--shadow-glow);
+.animate-dash {
+  animation: dash 8s linear infinite;
 }

@@ -1,11 +1,51 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Clock, AlertTriangle, MapPin, CheckCircle, XCircle, RefreshCw, Coffee, Eye } from 'lucide-react';
+import { 
+  User, 
+  Clock, 
+  AlertTriangle, 
+  MapPin, 
+  CheckCircle, 
+  RefreshCw, 
+  Coffee, 
+  Search, 
+  ChevronDown, 
+  Calendar, 
+  Building, 
+  MoreVertical, 
+  ChevronLeft, 
+  ChevronRight 
+} from 'lucide-react';
 import MainLayout from '../layouts/MainLayout';
 import useWebSockets from '../hooks/useWebSockets';
 import './Actividad.css';
 
-const API_URL = import.meta.env.VITE_API_URL;
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
+
+const getInitials = (name) => {
+  if (!name) return 'U';
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  }
+  return parts[0].substring(0, 2).toUpperCase();
+};
+
+const getAvatarTheme = (name) => {
+  const colors = [
+    { bg: '#dcfce7', text: '#15803d' }, // Green
+    { bg: '#f3e8ff', text: '#7e22ce' }, // Purple
+    { bg: '#ffe4e6', text: '#be123c' }, // Rose
+    { bg: '#fff7ed', text: '#ea580c' }, // Orange
+    { bg: '#e0f2fe', text: '#0284c7' }, // Sky/Blue
+    { bg: '#ecfeff', text: '#0891b2' }  // Cyan
+  ];
+  let sum = 0;
+  if (name) {
+    sum = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  }
+  return colors[sum % colors.length];
+};
 
 const Actividad = () => {
   const navigate = useNavigate();
@@ -13,6 +53,11 @@ const Actividad = () => {
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
+
+  // Filter & Search states
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedSede, setSelectedSede] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
 
   const fetchProfile = async () => {
     const token = localStorage.getItem('access_token');
@@ -75,19 +120,39 @@ const Actividad = () => {
   }, [navigate]);
 
   // Determinar rol
-  const rolNombre = userProfile?.rol_info?.nombre?.toLowerCase() || '';
   const rolCodigo = userProfile?.rol_info?.codigo || '';
   const isOperador = rolCodigo === 'OPERADOR';
   const isAsesor = rolCodigo === 'ASESOR';
   const isOperativo = isOperador || isAsesor;
-  const isGerente = rolCodigo === 'GERENTE' || rolCodigo === 'SUPERVISOR';
-  const isSuperadmin = rolCodigo === 'SUPERADMIN';
+
+  // Filtros aplicados localmente
+  const filteredActividades = actividades.filter(a => {
+    const nameMatch = (a.nombre_completo || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                      (a.dni || '').toLowerCase().includes(searchTerm.toLowerCase());
+    const sedeMatch = !selectedSede || a.sede === selectedSede;
+    return nameMatch && sedeMatch;
+  });
+
+  // Lista de sedes únicas presentes en el listado para poblar el filtro
+  const uniqueSedes = Array.from(new Set(actividades.map(a => a.sede).filter(Boolean)));
+
+  // Paginación local
+  const itemsPerPage = 10;
+  const totalPages = Math.ceil(filteredActividades.length / itemsPerPage) || 1;
+  const indexOfLast = currentPage * itemsPerPage;
+  const indexOfFirst = indexOfLast - itemsPerPage;
+  const currentList = filteredActividades.slice(indexOfFirst, indexOfLast);
+
+  // Resetear página actual si cambian los filtros
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedSede]);
 
   // Cálculos para las tarjetas de resumen
   const totalOperativos = actividades.length;
   const activosHoy = actividades.filter(a => a.asistencia && a.asistencia.estado !== 'Sin Marcar').length;
-  const sinMarcar = actividades.filter(a => !a.asistencia || a.asistencia.estado === 'Sin Marcar').length;
-  const enBreak = actividades.filter(a => a.asistencia && a.asistencia.estado === 'En break').length;
+  const sinMarcar = totalOperativos - activosHoy;
+  const enBreak = actividades.filter(a => a.asistencia && a.asistencia.estado === 'En Break').length;
   const enActividad = actividades.filter(a => a.actividad_actual).length;
   const fueraDeZona = actividades.filter(a => a.ultima_ubicacion?.distancia > (a.sede_info?.radio_metros || 500)).length;
   const conIncidencias = actividades.filter(a => a.incidencias > 0).length;
@@ -98,20 +163,29 @@ const Actividad = () => {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
+  const getFormattedTodayDate = () => {
+    const months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+    const d = new Date();
+    const day = d.getDate();
+    const month = months[d.getMonth()];
+    const year = d.getFullYear();
+    return `Hoy, ${day} ${month} ${year}`;
+  };
+
   const punctualityLabels = {
-    'temprano': 'Entrada Anticipada',
-    'puntual': 'Entrada Puntual',
-    'tardanza': 'Tardanza (Entrada)',
-    'no_marco_entrada': 'No marcó entrada',
-    'pendiente': 'Pendiente'
+    'temprano': 'ENTRADA ANTICIPADA',
+    'puntual': 'ENTRADA PUNTUAL',
+    'tardanza': 'TARDANZA',
+    'no_marco_entrada': 'NO MARCÓ ENTRADA',
+    'pendiente': 'PENDIENTE'
   };
 
   const exitStatusLabels = {
-    'temprano': 'Salida Temprana',
-    'puntual': 'Salida Puntual',
-    'tardanza': 'Salida Tardía',
-    'no_marco_salida': 'No marcó salida',
-    'pendiente': 'Pendiente'
+    'temprano': 'SALIDA ANTICIPADA',
+    'puntual': 'SALIDA PUNTUAL',
+    'tardanza': 'SALIDA TARDÍA',
+    'no_marco_salida': 'NO MARCÓ SALIDA',
+    'pendiente': 'PENDIENTE'
   };
 
   return (
@@ -121,23 +195,23 @@ const Actividad = () => {
     >
       <div className="actividad-container">
         
-
         {/* Tarjetas de Resumen (KPIs) - Ocultar para Operadores */}
         {!isOperativo && (
           <div className="kpi-grid">
             <div className="kpi-card">
               <div className="kpi-icon-wrapper bg-blue">
-                <User size={24} />
+                <User size={22} />
               </div>
               <div className="kpi-info">
                 <h3>Total Personal</h3>
                 <p className="kpi-value">{totalOperativos}</p>
+                <span className="kpi-subtext">Personal programado hoy</span>
               </div>
             </div>
 
             <div className="kpi-card">
               <div className="kpi-icon-wrapper bg-green">
-                <CheckCircle size={24} />
+                <CheckCircle size={22} />
               </div>
               <div className="kpi-info">
                 <h3>Activos Hoy</h3>
@@ -148,7 +222,7 @@ const Actividad = () => {
 
             <div className="kpi-card">
               <div className="kpi-icon-wrapper bg-yellow">
-                <Coffee size={24} />
+                <Coffee size={22} />
               </div>
               <div className="kpi-info">
                 <h3>En Descanso</h3>
@@ -159,7 +233,7 @@ const Actividad = () => {
 
             <div className="kpi-card">
               <div className="kpi-icon-wrapper bg-red">
-                <AlertTriangle size={24} />
+                <AlertTriangle size={22} />
               </div>
               <div className="kpi-info">
                 <h3>Fuera de Zona</h3>
@@ -172,142 +246,268 @@ const Actividad = () => {
 
         {/* Tabla de Actividad */}
         <div className="actividad-table-wrapper card">
-          <div className="card-header">
+          <div className="card-header-monitoreo">
             <h2>{isOperativo ? "Mi Actividad" : "Detalle de Actividad"}</h2>
+            
+            {/* Barra de Filtros */}
+            {!isOperativo && (
+              <div className="filters-toolbar-monitoreo">
+                {/* Filtro Fecha */}
+                <div className="filter-pill-btn-monitoreo">
+                  <Calendar size={15} className="filter-pill-icon-blue" />
+                  <span className="filter-pill-text-monitoreo">{getFormattedTodayDate()}</span>
+                  <ChevronDown size={14} className="filter-pill-chevron" />
+                </div>
+
+                {/* Filtro Sede */}
+                <div className="filter-pill-select-wrapper-monitoreo">
+                  <Building size={15} className="filter-pill-icon-blue" />
+                  <select 
+                    value={selectedSede}
+                    onChange={(e) => setSelectedSede(e.target.value)}
+                    className="filter-pill-select-monitoreo"
+                  >
+                    <option value="">Todas las sedes</option>
+                    {uniqueSedes.map((sede, idx) => (
+                      <option key={idx} value={sede}>{sede}</option>
+                    ))}
+                  </select>
+                  <ChevronDown size={14} className="filter-pill-chevron" />
+                </div>
+
+                {/* Buscador */}
+                <div className="search-bar-wrapper-monitoreo">
+                  <Search size={15} className="search-bar-icon-monitoreo" />
+                  <input 
+                    type="text" 
+                    placeholder="Buscar usuario..." 
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="search-bar-input-monitoreo"
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           {loading && actividades.length === 0 ? (
-            <div className="loading-state">Cargando actividad...</div>
-          ) : actividades.length === 0 ? (
-            <div className="empty-state">
-              <User size={48} className="empty-icon" />
-              <p>{isOperativo ? "No tienes actividad registrada hoy." : "No hay personal registrado o activo hoy."}</p>
+            <div className="loading-state-monitoreo">
+              <RefreshCw className="animate-spin" size={24} />
+              <span>Cargando actividad...</span>
+            </div>
+          ) : filteredActividades.length === 0 ? (
+            <div className="empty-state-monitoreo">
+              <User size={48} className="empty-icon-monitoreo" />
+              <p>{isOperativo ? "No tienes actividad registrada hoy." : "No se encontraron operativos activos con los filtros aplicados."}</p>
             </div>
           ) : (
-            <div className="table-responsive">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Usuario</th>
-                    <th>Rol</th>
-                    <th>Sede</th>
-                    <th>Marcaciones</th>
-                    <th>Actividad Actual</th>
-                    <th>GPS</th>
-                    <th>Estado</th>
-                    <th>Alertas</th>
-                    <th>Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {actividades.map(user => (
-                    <tr key={user.id}>
-                      <td>
-                        <div className="user-cell">
-                          <div className="user-avatar">
-                            {user.nombre_completo.charAt(0)}
-                          </div>
-                          <div>
-                            <div className="font-semibold">{user.nombre_completo}</div>
-                            <div className="text-xs text-muted">{user.dni}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td>
-                        <span className={`role-badge mini ${user.rol_info?.codigo?.toLowerCase()}`}>
-                          {user.rol_info?.nombre || '-'}
-                        </span>
-                      </td>
-                      <td>{user.sede}</td>
-                      <td>
-                        <div className="time-stack">
-                          <span title="Entrada">E: {formatTime(user.asistencia?.hora_entrada)}</span>
-                          {user.asistencia?.hora_inicio_break && (
-                            <span title="Break" className="text-xs text-warning">
-                              B: {formatTime(user.asistencia?.hora_inicio_break)}
+            <>
+              <div className="table-responsive-monitoreo">
+                <table className="data-table-monitoreo">
+                  <thead>
+                    <tr>
+                      <th>Usuario</th>
+                      <th>Rol</th>
+                      <th>Sede</th>
+                      <th>Marcaciones</th>
+                      <th>Actividad Actual</th>
+                      <th>GPS</th>
+                      <th>Estado</th>
+                      <th>Alertas</th>
+                      <th style={{ textAlign: 'center' }}>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {currentList.map(user => {
+                      const avatarTheme = getAvatarTheme(user.nombre_completo);
+                      const uRol = (user.rol_info?.nombre || user.cargo || '').toUpperCase();
+                      const statusVal = user.asistencia?.estado || 'Sin Marcar';
+                      const statusClass = statusVal.toLowerCase().replace(' ', '-');
+                      
+                      const hasFz = user.ultima_ubicacion?.distancia > (user.sede_info?.radio_metros || 500);
+                      const hasInc = user.incidencias > 0;
+                      const hasAssistance = user.asistencia && user.asistencia.estado !== 'Sin Marcar';
+
+                      return (
+                        <tr key={user.id}>
+                          {/* Usuario */}
+                          <td>
+                            <div className="user-cell-monitoreo">
+                              <div 
+                                className="user-avatar-monitoreo"
+                                style={{
+                                  backgroundColor: avatarTheme.bg,
+                                  color: avatarTheme.text
+                                }}
+                              >
+                                {getInitials(user.nombre_completo)}
+                              </div>
+                              <div className="user-details-monitoreo">
+                                <span className="user-name-monitoreo">{user.nombre_completo}</span>
+                                <span className="user-dni-monitoreo">{user.dni}</span>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Rol */}
+                          <td>
+                            <span className={`role-badge-monitoreo ${uRol.toLowerCase().includes('asesor') ? 'asesor' : 'operador'}`}>
+                              {uRol}
                             </span>
-                          )}
-                          <span title="Salida">S: {formatTime(user.asistencia?.hora_salida)}</span>
-                        </div>
-                      </td>
-                      <td>
-                        {user.rol_info?.codigo === 'ASESOR' ? (
-                          <div className="actividad-cell">
-                            {user.actividad_actual ? (
-                              <div className="actividad-current">
-                                <span className="actividad-label">En proceso:</span>
-                                <span className="actividad-name">{user.actividad_actual.titulo}</span>
-                                <span className="actividad-time">{formatTime(user.actividad_actual.hora_inicio_actividad)}</span>
+                          </td>
+
+                          {/* Sede */}
+                          <td>
+                            <span className="sede-text-monitoreo">{user.sede || '-'}</span>
+                          </td>
+
+                          {/* Marcaciones */}
+                          <td>
+                            <div className="time-stack-monitoreo">
+                              <span title="Entrada">E: {user.asistencia?.hora_entrada ? formatTime(user.asistencia.hora_entrada) : '-'}</span>
+                              {user.asistencia?.hora_inicio_break && (
+                                <span title="Break" className="text-xs text-warning">
+                                  B: {formatTime(user.asistencia.hora_inicio_break)}
+                                </span>
+                              )}
+                              <span title="Salida">S: {user.asistencia?.hora_salida ? formatTime(user.asistencia.hora_salida) : '-'}</span>
+                            </div>
+                          </td>
+
+                          {/* Actividad Actual */}
+                          <td>
+                            {user.rol_info?.codigo === 'ASESOR' ? (
+                              <div className="actividad-cell-monitoreo">
+                                {user.actividad_actual ? (
+                                  <div className="actividad-current-monitoreo">
+                                    <span className="actividad-label-monitoreo">En proceso:</span>
+                                    <span className="actividad-name-monitoreo">{user.actividad_actual.titulo}</span>
+                                    <span className="actividad-time-monitoreo">{formatTime(user.actividad_actual.hora_inicio_actividad)}</span>
+                                  </div>
+                                ) : (
+                                  <span className="text-muted-monitoreo">-</span>
+                                )}
                               </div>
                             ) : (
-                              <span className="text-muted text-xs">Sin actividad en proceso</span>
+                              <span className="text-muted-monitoreo">-</span>
                             )}
-                            <div className="actividad-total">
-                              Total: {user.total_actividades || 0}
+                          </td>
+
+                          {/* GPS capsule vertical */}
+                          <td>
+                            <div className="gps-capsule-monitoreo">
+                              <span className="gps-number-monitoreo">{user.puntos_gps || 0}</span>
+                              <span className="gps-label-monitoreo">pts</span>
                             </div>
-                          </div>
-                        ) : (
-                          <span className="text-muted">-</span>
-                        )}
-                      </td>
-                      <td>
-                        <span className="gps-count">
-                          {user.puntos_gps} pts
-                        </span>
-                      </td>
-                      <td>
-                        <div className="flex flex-col gap-1">
-                          <span className={`status-badge ${(user.asistencia?.estado || 'Sin Marcar').toLowerCase().replace(' ', '-')}`}>
-                            {user.asistencia?.estado || 'Sin Marcar'}
-                          </span>
-                          {user.asistencia?.estado_puntualidad && user.asistencia.estado_puntualidad !== 'pendiente' && (
-                             <span className={`status-badge small ${user.asistencia.estado_puntualidad}`}>
-                               {punctualityLabels[user.asistencia.estado_puntualidad] || user.asistencia.estado_puntualidad}
-                             </span>
-                          )}
-                          {user.asistencia?.estado_salida && user.asistencia.estado_salida !== 'pendiente' && (
-                             <span className={`status-badge small ${user.asistencia.estado_salida}`}>
-                               {exitStatusLabels[user.asistencia.estado_salida] || user.asistencia.estado_salida}
-                             </span>
-                          )}
-                        </div>
-                      </td>
-                      <td>
-                        <div className="alerts-cell">
-                          {user.ultima_ubicacion?.distancia > (user.sede_info?.radio_metros || 500) && (
-                            <span className="alert-badge warning" title="Fuera de Zona">
-                              <MapPin size={14} />
-                              FZ
-                            </span>
-                          )}
-                          {user.incidencias > 0 && (
-                            <span className="alert-badge danger" title={`${user.incidencias} Incidencias`}>
-                              <AlertTriangle size={14} />
-                              {user.incidencias} Inc.
-                            </span>
-                          )}
-                          {!(user.ultima_ubicacion?.distancia > (user.sede_info?.radio_metros || 500)) && user.incidencias === 0 && user.asistencia && user.asistencia.estado !== 'Sin Marcar' && (
-                            <span className="alert-badge success">
-                              <CheckCircle size={14} />
-                              OK
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td>
-                        <button 
-                          className="btn-icon text-primary" 
-                          onClick={() => navigate(`/actividad/${user.id}`)}
-                          title="Ver Detalle"
-                        >
-                          <Eye size={18} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                          </td>
+
+                          {/* Estado */}
+                          <td>
+                            <div className="status-container-monitoreo">
+                              <span className={`status-badge-monitoreo ${statusClass}`}>
+                                {statusVal.toUpperCase()}
+                              </span>
+                              
+                              {/* Sub-badge de puntualidad */}
+                              {user.asistencia?.estado_puntualidad && user.asistencia.estado_puntualidad !== 'pendiente' && (
+                                <span className={`status-sub-badge-monitoreo ${user.asistencia.estado_puntualidad}`}>
+                                  {punctualityLabels[user.asistencia.estado_puntualidad]}
+                                </span>
+                              )}
+                              {/* Sub-badge de salida */}
+                              {user.asistencia?.estado_salida && user.asistencia.estado_salida !== 'pendiente' && (
+                                <span className={`status-sub-badge-monitoreo ${user.asistencia.estado_salida}`}>
+                                  {exitStatusLabels[user.asistencia.estado_salida]}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* Alertas */}
+                          <td>
+                            <div className="alerts-cell-monitoreo">
+                              {hasFz && (
+                                <span className="alert-badge-monitoreo warning" title="Fuera de Zona">
+                                  <MapPin size={12} />
+                                  <span>FZ</span>
+                                </span>
+                              )}
+                              {hasInc && (
+                                <span className="alert-badge-monitoreo danger" title={`${user.incidencias} Incidencias`}>
+                                  <AlertTriangle size={12} />
+                                  <span>{user.incidencias} Inc.</span>
+                                </span>
+                              )}
+                              {!hasFz && !hasInc && hasAssistance && (
+                                <span className="alert-badge-monitoreo success">
+                                  <CheckCircle size={12} className="alert-success-icon" />
+                                  <span>OK</span>
+                                </span>
+                              )}
+                              {!hasAssistance && (
+                                <span className="alert-badge-monitoreo ok-default">
+                                  <CheckCircle size={12} className="alert-success-icon" />
+                                  <span>OK</span>
+                                </span>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* Acciones (dots button) */}
+                          <td style={{ textAlign: 'center' }}>
+                            <button 
+                              className="btn-action-more-monitoreo" 
+                              onClick={() => navigate(`/actividad/${user.id}`)}
+                              title="Ver Detalle"
+                            >
+                              <MoreVertical size={16} />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Paginación */}
+              {!isOperativo && (
+                <div className="table-pagination-footer-monitoreo">
+                  <span className="pagination-legend-monitoreo">
+                    Mostrando {indexOfFirst + 1} a {Math.min(indexOfLast, filteredActividades.length)} de {filteredActividades.length} resultados
+                  </span>
+
+                  <div className="pagination-buttons-monitoreo">
+                    <button
+                      className="btn-page-arrow-monitoreo"
+                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                      disabled={currentPage === 1}
+                      type="button"
+                    >
+                      <ChevronLeft size={14} />
+                    </button>
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                      <button
+                        key={page}
+                        className={`btn-page-number-monitoreo ${currentPage === page ? 'active' : ''}`}
+                        onClick={() => setCurrentPage(page)}
+                        type="button"
+                      >
+                        {page}
+                      </button>
+                    ))}
+                    <button
+                      className="btn-page-arrow-monitoreo"
+                      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                      disabled={currentPage === totalPages}
+                      type="button"
+                    >
+                      <ChevronRight size={14} />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
