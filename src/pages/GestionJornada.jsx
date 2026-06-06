@@ -39,7 +39,7 @@ import MainLayout from '../layouts/MainLayout';
 import { useNotification } from '../context/NotificationContext';
 import './GestionJornada.css';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
+const API_URL = import.meta.env.VITE_API_URL || 'https://apifincontrol.finatech.com.pe/api';
 
 const getLocalDateString = () => {
   const d = new Date();
@@ -160,7 +160,7 @@ const GestionJornada = () => {
 
   const getUserAssignedSchedule = (userId) => {
     if (!userId) return null;
-    
+
     // Find active assignment for this user (independent of date)
     const assignment = usuariosConHorario.find(uh => uh.usuario === parseInt(userId) && uh.activo);
     if (!assignment) return null;
@@ -755,7 +755,7 @@ const GestionJornada = () => {
       if (successfulIds.length > 0) {
         // Refresh the detail data immediately to update the lists
         await fetchSedeDetailData(selectedSede.sede_id);
-        
+
         // Remove successful users from the modal form selection
         setAssignForm(prev => ({
           ...prev,
@@ -899,22 +899,22 @@ const GestionJornada = () => {
 
   // Calculations for con_horario tab (KPIs and Filters)
   const pctConHorario = usuariosSede.length > 0 ? Math.round((usuariosConHorario.length / usuariosSede.length) * 100) : 0;
-  
+
   const vigentesEstaSemana = usuariosConHorario.filter(uh => {
     if (!uh.vigente_hasta) return true;
     const hastaDate = new Date(uh.vigente_hasta);
     const today = new Date();
-    today.setHours(0,0,0,0);
+    today.setHours(0, 0, 0, 0);
     return hastaDate >= today;
   }).length;
-  
+
   const pctVigentes = usuariosConHorario.length > 0 ? Math.round((vigentesEstaSemana / usuariosConHorario.length) * 100) : 0;
 
   const proximosVencimientos = usuariosConHorario.filter(uh => {
     if (!uh.vigente_hasta) return false;
     const hasta = new Date(uh.vigente_hasta);
     const today = new Date();
-    today.setHours(0,0,0,0);
+    today.setHours(0, 0, 0, 0);
     const diffTime = hasta - today;
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     return diffDays >= 0 && diffDays <= 7;
@@ -1103,7 +1103,7 @@ const GestionJornada = () => {
                         {horarios.map(h => {
                           // Filter details to active days
                           const activeDetails = h.detalles ? h.detalles.filter(d => d.activo) : [];
-                          
+
                           // Day name translation map for abbreviation
                           const dayAbbrMap = {
                             'lunes': 'Lun',
@@ -1123,10 +1123,10 @@ const GestionJornada = () => {
 
                           // Extract first active day ranges for summary display
                           const firstActive = sortedDetails[0];
-                          const entradaRange = firstActive 
+                          const entradaRange = firstActive
                             ? `${firstActive.hora_inicio_entrada.substring(0, 5)} - ${firstActive.hora_fin_entrada.substring(0, 5)}`
                             : '00:00 - 00:00';
-                          const salidaRange = firstActive 
+                          const salidaRange = firstActive
                             ? `${firstActive.hora_inicio_salida.substring(0, 5)} - ${firstActive.hora_fin_salida.substring(0, 5)}`
                             : '00:00 - 00:00';
 
@@ -1134,7 +1134,7 @@ const GestionJornada = () => {
                           const lowercaseName = h.nombre.toLowerCase();
                           let iconThemeClass = 'default';
                           let IconComponent = Clock;
-                          
+
                           if (lowercaseName.includes('mañana') || lowercaseName.includes('dia') || lowercaseName.includes('día')) {
                             iconThemeClass = 'morning';
                             IconComponent = Sun;
@@ -1159,16 +1159,16 @@ const GestionJornada = () => {
                                 </div>
                                 <div className="horario-card-top-right-p">
                                   <div className="schedule-actions-p">
-                                    <button 
-                                      className="btn-schedule-edit-p" 
+                                    <button
+                                      className="btn-schedule-edit-p"
                                       onClick={() => handleOpenHorarioModal(h)}
                                       title="Editar Horario"
                                       type="button"
                                     >
                                       <Edit2 size={14} />
                                     </button>
-                                    <button 
-                                      className="btn-schedule-delete-p" 
+                                    <button
+                                      className="btn-schedule-delete-p"
                                       onClick={() => handleDeleteHorario(h.id)}
                                       title="Eliminar Horario"
                                       type="button"
@@ -1228,8 +1228,8 @@ const GestionJornada = () => {
                       </div>
 
                       {/* Bottom "Crear nuevo horario" dotted card */}
-                      <div 
-                        className="horario-create-dotted-card-p" 
+                      <div
+                        className="horario-create-dotted-card-p"
                         onClick={() => handleOpenHorarioModal()}
                       >
                         <div className="create-dotted-icon-p">
@@ -1252,8 +1252,8 @@ const GestionJornada = () => {
                   const userDetail = usuariosSede.find(u => u.id === uh.usuario);
                   const name = userDetail?.nombre_completo || uh.usuario_nombre || '';
                   const email = userDetail?.email || '';
-                  const matchesSearch = name.toLowerCase().includes(conHorarioSearchTerm.toLowerCase()) || 
-                                        email.toLowerCase().includes(conHorarioSearchTerm.toLowerCase());
+                  const matchesSearch = name.toLowerCase().includes(conHorarioSearchTerm.toLowerCase()) ||
+                    email.toLowerCase().includes(conHorarioSearchTerm.toLowerCase());
                   const matchesHorario = conHorarioSelectedHorario === '' || uh.horario_nombre === conHorarioSelectedHorario;
                   return matchesSearch && matchesHorario;
                 });
@@ -1319,9 +1319,9 @@ const GestionJornada = () => {
                         <div className="toolbar-left">
                           <div className="toolbar-search-wrapper">
                             <Search size={16} className="search-icon" />
-                            <input 
-                              type="text" 
-                              placeholder="Buscar usuario..." 
+                            <input
+                              type="text"
+                              placeholder="Buscar usuario..."
                               value={conHorarioSearchTerm}
                               onChange={(e) => {
                                 setConHorarioSearchTerm(e.target.value);
@@ -1331,7 +1331,7 @@ const GestionJornada = () => {
                             />
                           </div>
                           <div className="toolbar-select-wrapper">
-                            <select 
+                            <select
                               value={conHorarioSelectedHorario}
                               onChange={(e) => {
                                 setConHorarioSelectedHorario(e.target.value);
@@ -1353,8 +1353,8 @@ const GestionJornada = () => {
                         </div>
                         <div className="toolbar-right">
                           <span className="results-count">{filteredUH.length} resultados</span>
-                          <button 
-                            className="btn-toolbar-refresh" 
+                          <button
+                            className="btn-toolbar-refresh"
                             onClick={() => fetchSedeDetailData(selectedSede.sede_id)}
                             title="Actualizar datos"
                             type="button"
@@ -1402,17 +1402,17 @@ const GestionJornada = () => {
                                   const uEmail = userDetail?.email || 'sin-correo@dominio.com';
                                   const uRol = userDetail?.rol_info?.nombre || userDetail?.rol?.nombre || userDetail?.cargo || uh.usuario_rol || 'Operador';
                                   const avatarTheme = getAvatarTheme(uName);
-                                  
+
                                   // Determine Schedule Color Theme dynamically
-                                  const scheduleThemeClass = 
+                                  const scheduleThemeClass =
                                     uh.horario_nombre?.toLowerCase().includes('mañana') ? 'theme-morning' :
-                                    uh.horario_nombre?.toLowerCase().includes('tarde') ? 'theme-evening' : 'theme-default';
+                                      uh.horario_nombre?.toLowerCase().includes('tarde') ? 'theme-evening' : 'theme-default';
 
                                   return (
                                     <tr key={uh.id}>
                                       <td>
                                         <div className="user-profile-cell-p">
-                                          <div 
+                                          <div
                                             className="user-avatar-circle-p"
                                             style={{
                                               backgroundColor: avatarTheme.bg,
@@ -1543,8 +1543,8 @@ const GestionJornada = () => {
                               <h5>Usuarios sin horario asignado</h5>
                               <p>Estos usuarios no tienen un turno asignado. Mientras estén en este estado, no podrán marcar su asistencia desde la app móvil.</p>
                             </div>
-                            <button 
-                              className="banner-close-btn-p" 
+                            <button
+                              className="banner-close-btn-p"
                               onClick={() => setShowSinHorarioBanner(false)}
                               title="Cerrar"
                               type="button"
@@ -1559,7 +1559,7 @@ const GestionJornada = () => {
                           <span className="sin-horario-count-p">
                             {usuariosSinHorario.length} {usuariosSinHorario.length === 1 ? 'usuario sin horario' : 'usuarios sin horario'}
                           </span>
-                          <button 
+                          <button
                             className="btn-assign-multiple-p"
                             onClick={() => handleOpenAssignModal()}
                             type="button"
@@ -1580,7 +1580,7 @@ const GestionJornada = () => {
                               <div key={u.id} className="sin-horario-card-p">
                                 {/* Profile Info */}
                                 <div className="card-profile-col-p">
-                                  <div 
+                                  <div
                                     className="user-avatar-circle-p"
                                     style={{
                                       backgroundColor: avatarTheme.bg,
@@ -1630,14 +1630,14 @@ const GestionJornada = () => {
 
                                 {/* Action Buttons */}
                                 <div className="card-actions-col-p">
-                                  <button 
+                                  <button
                                     className="btn-card-assign-p"
                                     onClick={() => handleOpenAssignModal(u)}
                                     type="button"
                                   >
                                     Asignar turno
                                   </button>
-                                  <button 
+                                  <button
                                     className="btn-card-more-p"
                                     title="Más opciones"
                                     type="button"
@@ -1669,11 +1669,11 @@ const GestionJornada = () => {
                   const repUser = usuariosSede.find(u => u.id === i.usuario_reemplazo);
                   const reqName = reqUser?.nombre_completo || i.usuario_solicitante_nombre || '';
                   const repName = repUser?.nombre_completo || i.usuario_reemplazo_nombre || '';
-                  
-                  const matchesSearch = reqName.toLowerCase().includes(intercambioSearchTerm.toLowerCase()) || 
-                                        repName.toLowerCase().includes(intercambioSearchTerm.toLowerCase()) ||
-                                        (i.motivo || '').toLowerCase().includes(intercambioSearchTerm.toLowerCase());
-                                        
+
+                  const matchesSearch = reqName.toLowerCase().includes(intercambioSearchTerm.toLowerCase()) ||
+                    repName.toLowerCase().includes(intercambioSearchTerm.toLowerCase()) ||
+                    (i.motivo || '').toLowerCase().includes(intercambioSearchTerm.toLowerCase());
+
                   const matchesEstado = intercambioSelectedEstado === '' || i.estado === intercambioSelectedEstado;
                   return matchesSearch && matchesEstado;
                 });
@@ -1691,7 +1691,7 @@ const GestionJornada = () => {
                 const statsRechazadas = intercambios.filter(x => x.estado === 'rechazado').length;
                 const statsTotal = intercambios.length;
 
-                 // Helper for time ranges
+                // Helper for time ranges
                 const getScheduleRangeStr = (horarioId) => {
                   if (!horarioId) return '';
                   const h = horarios.find(x => x.id === horarioId);
@@ -1713,11 +1713,11 @@ const GestionJornada = () => {
                     const year = dateParts[0];
                     const month = dateParts[1];
                     const day = dateParts[2];
-                    
+
                     const dateObj = new Date(year, month - 1, day);
                     const daysOfWeek = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
                     const dayName = daysOfWeek[dateObj.getDay()];
-                    
+
                     return {
                       formatted: `${day}/${month}/${year}`,
                       dayName: dayName
@@ -1788,9 +1788,9 @@ const GestionJornada = () => {
                         <div className="toolbar-left-p">
                           <div className="toolbar-search-wrapper-p">
                             <Search size={16} className="search-icon-p" />
-                            <input 
-                              type="text" 
-                              placeholder="Buscar usuario..." 
+                            <input
+                              type="text"
+                              placeholder="Buscar usuario..."
                               value={intercambioSearchTerm}
                               onChange={(e) => {
                                 setIntercambioSearchTerm(e.target.value);
@@ -1800,7 +1800,7 @@ const GestionJornada = () => {
                             />
                           </div>
                           <div className="toolbar-select-wrapper-p">
-                            <select 
+                            <select
                               value={intercambioSelectedEstado}
                               onChange={(e) => {
                                 setIntercambioSelectedEstado(e.target.value);
@@ -1868,13 +1868,13 @@ const GestionJornada = () => {
                                   const newHorarioObj = horarios.find(h => h.id === i.horario_reemplazo_original);
                                   const hNewName = newHorarioObj ? newHorarioObj.nombre : (i.horario_reemplazo_original_nombre || 'Sin Horario');
 
-                                  const origThemeClass = 
+                                  const origThemeClass =
                                     hOrigName.toLowerCase().includes('mañana') ? 'theme-morning' :
-                                    hOrigName.toLowerCase().includes('tarde') ? 'theme-evening' : 'theme-default';
-                                  
-                                  const newThemeClass = 
+                                      hOrigName.toLowerCase().includes('tarde') ? 'theme-evening' : 'theme-default';
+
+                                  const newThemeClass =
                                     hNewName.toLowerCase().includes('mañana') ? 'theme-morning' :
-                                    hNewName.toLowerCase().includes('tarde') ? 'theme-evening' : 'theme-default';
+                                      hNewName.toLowerCase().includes('tarde') ? 'theme-evening' : 'theme-default';
 
                                   const { formatted: dateFormatted, dayName } = formatIntercambioDate(i.fecha_intercambio);
 
@@ -1887,7 +1887,7 @@ const GestionJornada = () => {
                                       {/* Solicitante */}
                                       <td>
                                         <div className="user-profile-cell-p">
-                                          <div 
+                                          <div
                                             className="user-avatar-circle-p"
                                             style={{
                                               backgroundColor: reqAvatarTheme.bg,
@@ -1913,7 +1913,7 @@ const GestionJornada = () => {
                                       {/* Reemplazo */}
                                       <td>
                                         <div className="user-profile-cell-p">
-                                          <div 
+                                          <div
                                             className="user-avatar-circle-p"
                                             style={{
                                               backgroundColor: repAvatarTheme.bg,
@@ -2178,25 +2178,25 @@ const GestionJornada = () => {
                         <label className="time-card-label">Rango de Entrada de Trabajo *</label>
                         <div className="time-inputs-row">
                           <div className="time-input-wrapper">
-                            <input 
-                              type="time" 
+                            <input
+                              type="time"
                               value={globalTimes.hora_inicio_entrada}
                               onChange={(e) => { const val = e.target.value; setGlobalTimes(prev => ({ ...prev, hora_inicio_entrada: val })); setHorarioForm(prev => { const updated = prev.detalles.map(d => ({ ...d, hora_inicio_entrada: val })); return { ...prev, detalles: updated }; }); }}
-                              className="input-field-time" 
-                              required 
-                              step="1" 
+                              className="input-field-time"
+                              required
+                              step="1"
                             />
                             <Clock size={14} className="time-input-clock" />
                           </div>
                           <span className="time-separator">a</span>
                           <div className="time-input-wrapper">
-                            <input 
-                              type="time" 
+                            <input
+                              type="time"
                               value={globalTimes.hora_fin_entrada}
                               onChange={(e) => { const val = e.target.value; setGlobalTimes(prev => ({ ...prev, hora_fin_entrada: val })); setHorarioForm(prev => { const updated = prev.detalles.map(d => ({ ...d, hora_fin_entrada: val })); return { ...prev, detalles: updated }; }); }}
-                              className="input-field-time" 
-                              required 
-                              step="1" 
+                              className="input-field-time"
+                              required
+                              step="1"
                             />
                             <Clock size={14} className="time-input-clock" />
                           </div>
@@ -2214,25 +2214,25 @@ const GestionJornada = () => {
                         <label className="time-card-label">Rango de Salida de Trabajo *</label>
                         <div className="time-inputs-row">
                           <div className="time-input-wrapper">
-                            <input 
-                              type="time" 
+                            <input
+                              type="time"
                               value={globalTimes.hora_inicio_salida}
                               onChange={(e) => { const val = e.target.value; setGlobalTimes(prev => ({ ...prev, hora_inicio_salida: val })); setHorarioForm(prev => { const updated = prev.detalles.map(d => ({ ...d, hora_inicio_salida: val })); return { ...prev, detalles: updated }; }); }}
-                              className="input-field-time" 
-                              required 
-                              step="1" 
+                              className="input-field-time"
+                              required
+                              step="1"
                             />
                             <Clock size={14} className="time-input-clock" />
                           </div>
                           <span className="time-separator">a</span>
                           <div className="time-input-wrapper">
-                            <input 
-                              type="time" 
+                            <input
+                              type="time"
                               value={globalTimes.hora_fin_salida}
                               onChange={(e) => { const val = e.target.value; setGlobalTimes(prev => ({ ...prev, hora_fin_salida: val })); setHorarioForm(prev => { const updated = prev.detalles.map(d => ({ ...d, hora_fin_salida: val })); return { ...prev, detalles: updated }; }); }}
-                              className="input-field-time" 
-                              required 
-                              step="1" 
+                              className="input-field-time"
+                              required
+                              step="1"
                             />
                             <Clock size={14} className="time-input-clock" />
                           </div>
@@ -2246,8 +2246,8 @@ const GestionJornada = () => {
                     <label className="section-label-modal">Selecciona los días activos para este turno</label>
                     <div className="flex flex-wrap gap-2 mt-2">
                       {horarioForm.detalles.map((d, index) => (
-                        <button 
-                          key={d.dia_semana} 
+                        <button
+                          key={d.dia_semana}
                           type="button"
                           className={`day-selector-btn-pill capitalize ${d.activo ? 'active' : ''}`}
                           onClick={() => handleDayToggle(index)}
@@ -2269,73 +2269,73 @@ const GestionJornada = () => {
                         <div key={d.dia_semana} className={`day-config-card ${d.activo ? 'active' : ''} ${isDomingo ? 'domingo-card' : ''}`}>
                           <div className="day-card-header">
                             <label className="checkbox-label flex items-center gap-2">
-                              <input 
-                                type="checkbox" 
-                                checked={d.activo} 
-                                onChange={() => handleDayToggle(index)} 
+                              <input
+                                type="checkbox"
+                                checked={d.activo}
+                                onChange={() => handleDayToggle(index)}
                                 className="day-card-checkbox"
                               />
                               <span className="capitalize font-semibold">{d.dia_semana}</span>
                             </label>
                           </div>
-                          
+
                           <div className={`day-card-times mt-3 ${isDomingo ? 'domingo-times-row' : ''}`}>
                             <div className="time-group">
                               <label className="time-group-label">Entrada Rango</label>
                               <div className="time-inputs-row-sm">
                                 <div className="time-input-wrapper-sm">
-                                  <input 
-                                    type="time" 
-                                    value={d.activo ? d.hora_inicio_entrada : ''} 
-                                    onChange={(e) => handleTimeChange(index, 'hora_inicio_entrada', e.target.value)} 
-                                    className="input-field-time-sm" 
+                                  <input
+                                    type="time"
+                                    value={d.activo ? d.hora_inicio_entrada : ''}
+                                    onChange={(e) => handleTimeChange(index, 'hora_inicio_entrada', e.target.value)}
+                                    className="input-field-time-sm"
                                     disabled={!d.activo}
-                                    required={d.activo} 
-                                    step="1" 
+                                    required={d.activo}
+                                    step="1"
                                   />
                                   <Clock size={12} className="time-input-clock-sm" />
                                 </div>
                                 <span className="time-separator-sm">a</span>
                                 <div className="time-input-wrapper-sm">
-                                  <input 
-                                    type="time" 
-                                    value={d.activo ? d.hora_fin_entrada : ''} 
-                                    onChange={(e) => handleTimeChange(index, 'hora_fin_entrada', e.target.value)} 
-                                    className="input-field-time-sm" 
+                                  <input
+                                    type="time"
+                                    value={d.activo ? d.hora_fin_entrada : ''}
+                                    onChange={(e) => handleTimeChange(index, 'hora_fin_entrada', e.target.value)}
+                                    className="input-field-time-sm"
                                     disabled={!d.activo}
-                                    required={d.activo} 
-                                    step="1" 
+                                    required={d.activo}
+                                    step="1"
                                   />
                                   <Clock size={12} className="time-input-clock-sm" />
                                 </div>
                               </div>
                             </div>
-                            
+
                             <div className={`time-group ${isDomingo ? '' : 'mt-3'}`}>
                               <label className="time-group-label">Salida Rango</label>
                               <div className="time-inputs-row-sm">
                                 <div className="time-input-wrapper-sm">
-                                  <input 
-                                    type="time" 
-                                    value={d.activo ? d.hora_inicio_salida : ''} 
-                                    onChange={(e) => handleTimeChange(index, 'hora_inicio_salida', e.target.value)} 
-                                    className="input-field-time-sm" 
+                                  <input
+                                    type="time"
+                                    value={d.activo ? d.hora_inicio_salida : ''}
+                                    onChange={(e) => handleTimeChange(index, 'hora_inicio_salida', e.target.value)}
+                                    className="input-field-time-sm"
                                     disabled={!d.activo}
-                                    required={d.activo} 
-                                    step="1" 
+                                    required={d.activo}
+                                    step="1"
                                   />
                                   <Clock size={12} className="time-input-clock-sm" />
                                 </div>
                                 <span className="time-separator-sm">a</span>
                                 <div className="time-input-wrapper-sm">
-                                  <input 
-                                    type="time" 
-                                    value={d.activo ? d.hora_fin_salida : ''} 
-                                    onChange={(e) => handleTimeChange(index, 'hora_fin_salida', e.target.value)} 
-                                    className="input-field-time-sm" 
+                                  <input
+                                    type="time"
+                                    value={d.activo ? d.hora_fin_salida : ''}
+                                    onChange={(e) => handleTimeChange(index, 'hora_fin_salida', e.target.value)}
+                                    className="input-field-time-sm"
                                     disabled={!d.activo}
-                                    required={d.activo} 
-                                    step="1" 
+                                    required={d.activo}
+                                    step="1"
                                   />
                                   <Clock size={12} className="time-input-clock-sm" />
                                 </div>
@@ -2360,12 +2360,12 @@ const GestionJornada = () => {
                     <>
                       <div className="user-search-wrapper mt-3 mb-2">
                         <Search size={14} className="user-search-icon" />
-                        <input 
-                          type="text" 
+                        <input
+                          type="text"
                           className="user-search-input-modal"
                           placeholder="Buscar usuarios por nombre..."
                           value={userSearchTerm}
-                          onChange={(e) => setUserSearchTerm(e.target.value)} 
+                          onChange={(e) => setUserSearchTerm(e.target.value)}
                         />
                       </div>
                       <div className="users-select-checklist-scroll mt-2">
@@ -2382,7 +2382,7 @@ const GestionJornada = () => {
                                   onChange={() => handleToggleUserSelect(u.id)}
                                   className="user-select-checkbox-p"
                                 />
-                                <div 
+                                <div
                                   className="user-avatar-circle-sm-p"
                                   style={{
                                     backgroundColor: avatarTheme.bg,
@@ -2405,12 +2405,12 @@ const GestionJornada = () => {
                             <label className="input-label-p">Vigente Desde *</label>
                             <div className="date-input-wrapper-custom">
                               <Calendar size={16} className="date-input-icon" />
-                              <input 
-                                type="date" 
+                              <input
+                                type="date"
                                 value={horarioForm.vigente_desde}
                                 onChange={(e) => setHorarioForm(prev => ({ ...prev, vigente_desde: e.target.value }))}
-                                required 
-                                className="input-field-date-custom" 
+                                required
+                                className="input-field-date-custom"
                               />
                             </div>
                           </div>
@@ -2418,11 +2418,11 @@ const GestionJornada = () => {
                             <label className="input-label-p">Vigente Hasta</label>
                             <div className="date-input-wrapper-custom">
                               <Calendar size={16} className="date-input-icon" />
-                              <input 
-                                type="date" 
+                              <input
+                                type="date"
                                 value={horarioForm.vigente_hasta}
                                 onChange={(e) => setHorarioForm(prev => ({ ...prev, vigente_hasta: e.target.value }))}
-                                className="input-field-date-custom" 
+                                className="input-field-date-custom"
                               />
                             </div>
                           </div>
@@ -2443,12 +2443,12 @@ const GestionJornada = () => {
                       <label className="input-label-p">Vigente Desde *</label>
                       <div className="date-input-wrapper-custom">
                         <Calendar size={16} className="date-input-icon" />
-                        <input 
-                          type="date" 
+                        <input
+                          type="date"
                           value={horarioForm.vigente_desde}
                           onChange={(e) => setHorarioForm(prev => ({ ...prev, vigente_desde: e.target.value }))}
-                          required 
-                          className="input-field-date-custom" 
+                          required
+                          className="input-field-date-custom"
                         />
                       </div>
                     </div>
@@ -2456,11 +2456,11 @@ const GestionJornada = () => {
                       <label className="input-label-p">Vigente Hasta</label>
                       <div className="date-input-wrapper-custom">
                         <Calendar size={16} className="date-input-icon" />
-                        <input 
-                          type="date" 
+                        <input
+                          type="date"
                           value={horarioForm.vigente_hasta}
                           onChange={(e) => setHorarioForm(prev => ({ ...prev, vigente_hasta: e.target.value }))}
-                          className="input-field-date-custom" 
+                          className="input-field-date-custom"
                         />
                       </div>
                     </div>
@@ -2514,8 +2514,8 @@ const GestionJornada = () => {
               {/* Campo Desplegable de Horario */}
               <div className="form-group position-relative" ref={horarioDropdownRef}>
                 <label className="input-label-p">Horario/Turno a asignar *</label>
-                
-                <div 
+
+                <div
                   className={`dropdown-select-custom ${isHorarioDropdownOpen ? 'open' : ''} ${!assignForm.horario ? 'placeholder' : ''}`}
                   onClick={() => setIsHorarioDropdownOpen(prev => !prev)}
                 >
@@ -2550,8 +2550,8 @@ const GestionJornada = () => {
                         const countAssigned = usuariosConHorario.filter(uh => uh.horario === h.id).length;
                         const isSelected = parseInt(assignForm.horario) === h.id;
                         return (
-                          <div 
-                            key={h.id} 
+                          <div
+                            key={h.id}
                             className={`dropdown-option-custom ${isSelected ? 'selected' : ''}`}
                             onClick={() => {
                               setAssignForm(prev => ({ ...prev, horario: h.id }));
@@ -2579,7 +2579,7 @@ const GestionJornada = () => {
               <div className="form-group position-relative" ref={userDropdownRef}>
                 <label className="input-label-p">Seleccionar Usuarios *</label>
 
-                <div 
+                <div
                   className={`multiselect-trigger-custom ${isUserDropdownOpen ? 'open' : ''}`}
                   onClick={(e) => {
                     if (e.target.closest('.chip-delete-btn')) return;
@@ -2593,14 +2593,14 @@ const GestionJornada = () => {
                       const selectedUsers = usuariosSede.filter(u => assignForm.usuarios.includes(u.id));
                       const displayedChips = selectedUsers.slice(0, maxChipsToShow);
                       const hiddenCount = selectedUsers.length - displayedChips.length;
-                      
+
                       return (
                         <>
                           {displayedChips.map(u => {
                             const avatarTheme = getAvatarTheme(u.nombre_completo);
                             return (
-                              <span 
-                                key={u.id} 
+                              <span
+                                key={u.id}
                                 className="user-chip-custom"
                                 style={{
                                   backgroundColor: avatarTheme.bg,
@@ -2608,7 +2608,7 @@ const GestionJornada = () => {
                                   borderColor: avatarTheme.text + '20'
                                 }}
                               >
-                                <div 
+                                <div
                                   className="chip-avatar-circle"
                                   style={{
                                     backgroundColor: avatarTheme.text,
@@ -2618,8 +2618,8 @@ const GestionJornada = () => {
                                   {getInitials(u.nombre_completo)}
                                 </div>
                                 <span className="chip-text-name">{u.nombre_completo.split(' ')[0]} {u.nombre_completo.split(' ')[1] || ''}</span>
-                                <button 
-                                  type="button" 
+                                <button
+                                  type="button"
                                   className="chip-delete-btn"
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -2651,7 +2651,7 @@ const GestionJornada = () => {
                   <div className="dropdown-menu-custom user-dropdown-menu">
                     <div className="dropdown-search-container" onClick={(e) => e.stopPropagation()}>
                       <Search size={14} className="dropdown-search-icon" />
-                      <input 
+                      <input
                         type="text"
                         className="search-input-dropdown"
                         placeholder="Buscar por nombre o rol"
@@ -2659,8 +2659,8 @@ const GestionJornada = () => {
                         onChange={(e) => setUserSearchDropdownTerm(e.target.value)}
                       />
                       {userSearchDropdownTerm && (
-                        <button 
-                          type="button" 
+                        <button
+                          type="button"
                           className="clear-search-btn"
                           onClick={() => setUserSearchDropdownTerm('')}
                         >
@@ -2698,19 +2698,19 @@ const GestionJornada = () => {
                           );
 
                           return (
-                            <div 
+                            <div
                               key={u.id}
                               className={`user-option-row ${isSelected ? 'selected' : ''} ${hasConflict ? 'has-conflict-row' : ''}`}
                               onClick={() => handleToggleAssignUser(u.id)}
                             >
                               <div className="user-option-left">
-                                <input 
+                                <input
                                   type="checkbox"
                                   checked={isSelected}
                                   readOnly
                                   className="user-option-checkbox"
                                 />
-                                <div 
+                                <div
                                   className="user-option-avatar"
                                   style={{
                                     backgroundColor: avatarTheme.bg,
@@ -2723,7 +2723,7 @@ const GestionJornada = () => {
                                   <span className="user-option-name">{u.nombre_completo}</span>
                                 </div>
                               </div>
-                              
+
                               <div className="user-option-right">
                                 {hasConflict ? (
                                   <span className="conflict-warning-badge" title={`Conflicto con '${hasConflict.horario.nombre}'`}>
@@ -2834,7 +2834,7 @@ const GestionJornada = () => {
                     .map(u => {
                       const sched = getUserAssignedSchedule(u.id);
                       const horarioName = sched ? sched.horario.nombre : '';
-                      const hours = sched ? ` (${sched.detail.hora_inicio_entrada.substring(0,5)} - ${sched.detail.hora_fin_salida.substring(0,5)})` : '';
+                      const hours = sched ? ` (${sched.detail.hora_inicio_entrada.substring(0, 5)} - ${sched.detail.hora_fin_salida.substring(0, 5)})` : '';
                       return (
                         <option key={u.id} value={u.id}>
                           {u.nombre_completo} ({u.rol_info?.nombre || u.rol?.nombre || u.cargo || 'Operador'}) - {horarioName}{hours}
@@ -2858,23 +2858,23 @@ const GestionJornada = () => {
                   {(() => {
                     const solicitanteId = parseInt(swapForm.usuario_solicitante);
                     if (!solicitanteId) return null;
-                    
+
                     const schedA = getUserAssignedSchedule(solicitanteId);
                     if (!schedA) return null;
-                    
+
                     return usuariosSede
                       .filter(u => u.id !== solicitanteId)
                       .filter(u => {
                         const schedB = getUserAssignedSchedule(u.id);
                         if (!schedB) return false; // Both must have a schedule to swap!
-                        
+
                         // They must have different schedules to swap
                         return schedB.horario.id !== schedA.horario.id;
                       })
                       .map(u => {
                         const schedB = getUserAssignedSchedule(u.id);
-                        const labelText = schedB 
-                          ? ` - ${schedB.horario.nombre} (${schedB.detail.hora_inicio_entrada.substring(0,5)} - ${schedB.detail.hora_fin_salida.substring(0,5)})`
+                        const labelText = schedB
+                          ? ` - ${schedB.horario.nombre} (${schedB.detail.hora_inicio_entrada.substring(0, 5)} - ${schedB.detail.hora_fin_salida.substring(0, 5)})`
                           : '';
                         return (
                           <option key={u.id} value={u.id}>

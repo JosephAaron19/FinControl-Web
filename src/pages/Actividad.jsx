@@ -1,26 +1,26 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  User, 
-  Clock, 
-  AlertTriangle, 
-  MapPin, 
-  CheckCircle, 
-  RefreshCw, 
-  Coffee, 
-  Search, 
-  ChevronDown, 
-  Calendar, 
-  Building, 
-  MoreVertical, 
-  ChevronLeft, 
-  ChevronRight 
+import {
+  User,
+  Clock,
+  AlertTriangle,
+  MapPin,
+  CheckCircle,
+  RefreshCw,
+  Coffee,
+  Search,
+  ChevronDown,
+  Calendar,
+  Building,
+  MoreVertical,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import MainLayout from '../layouts/MainLayout';
 import useWebSockets from '../hooks/useWebSockets';
 import './Actividad.css';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
+const API_URL = import.meta.env.VITE_API_URL || 'https://apifincontrol.finatech.com.pe/api';
 
 const getInitials = (name) => {
   if (!name) return 'U';
@@ -112,10 +112,10 @@ const Actividad = () => {
   useEffect(() => {
     fetchProfile();
     fetchActividad();
-    
+
     // Auto-refresh cada 2 minutos como backup
     const interval = setInterval(fetchActividad, 120000);
-    
+
     return () => clearInterval(interval);
   }, [navigate]);
 
@@ -128,7 +128,7 @@ const Actividad = () => {
   // Filtros aplicados localmente
   const filteredActividades = actividades.filter(a => {
     const nameMatch = (a.nombre_completo || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                      (a.dni || '').toLowerCase().includes(searchTerm.toLowerCase());
+      (a.dni || '').toLowerCase().includes(searchTerm.toLowerCase());
     const sedeMatch = !selectedSede || a.sede === selectedSede;
     return nameMatch && sedeMatch;
   });
@@ -189,12 +189,12 @@ const Actividad = () => {
   };
 
   return (
-    <MainLayout 
-      title="Monitoreo de Actividad" 
+    <MainLayout
+      title="Monitoreo de Actividad"
       subtitle={isOperativo ? "Tu actividad del día de hoy." : "Estado de los operativos en tiempo real para el día de hoy."}
     >
       <div className="actividad-container">
-        
+
         {/* Tarjetas de Resumen (KPIs) - Ocultar para Operadores */}
         {!isOperativo && (
           <div className="kpi-grid">
@@ -248,7 +248,7 @@ const Actividad = () => {
         <div className="actividad-table-wrapper card">
           <div className="card-header-monitoreo">
             <h2>{isOperativo ? "Mi Actividad" : "Detalle de Actividad"}</h2>
-            
+
             {/* Barra de Filtros */}
             {!isOperativo && (
               <div className="filters-toolbar-monitoreo">
@@ -262,7 +262,7 @@ const Actividad = () => {
                 {/* Filtro Sede */}
                 <div className="filter-pill-select-wrapper-monitoreo">
                   <Building size={15} className="filter-pill-icon-blue" />
-                  <select 
+                  <select
                     value={selectedSede}
                     onChange={(e) => setSelectedSede(e.target.value)}
                     className="filter-pill-select-monitoreo"
@@ -278,9 +278,9 @@ const Actividad = () => {
                 {/* Buscador */}
                 <div className="search-bar-wrapper-monitoreo">
                   <Search size={15} className="search-bar-icon-monitoreo" />
-                  <input 
-                    type="text" 
-                    placeholder="Buscar usuario..." 
+                  <input
+                    type="text"
+                    placeholder="Buscar usuario..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="search-bar-input-monitoreo"
@@ -323,7 +323,7 @@ const Actividad = () => {
                       const uRol = (user.rol_info?.nombre || user.cargo || '').toUpperCase();
                       const statusVal = user.asistencia?.estado || 'Sin Marcar';
                       const statusClass = statusVal.toLowerCase().replace(' ', '-');
-                      
+
                       const hasFz = user.ultima_ubicacion?.distancia > (user.sede_info?.radio_metros || 500);
                       const hasInc = user.incidencias > 0;
                       const hasAssistance = user.asistencia && user.asistencia.estado !== 'Sin Marcar';
@@ -333,7 +333,7 @@ const Actividad = () => {
                           {/* Usuario */}
                           <td>
                             <div className="user-cell-monitoreo">
-                              <div 
+                              <div
                                 className="user-avatar-monitoreo"
                                 style={{
                                   backgroundColor: avatarTheme.bg,
@@ -407,7 +407,7 @@ const Actividad = () => {
                               <span className={`status-badge-monitoreo ${statusClass}`}>
                                 {statusVal.toUpperCase()}
                               </span>
-                              
+
                               {/* Sub-badge de puntualidad */}
                               {user.asistencia?.estado_puntualidad && user.asistencia.estado_puntualidad !== 'pendiente' && (
                                 <span className={`status-sub-badge-monitoreo ${user.asistencia.estado_puntualidad}`}>
@@ -455,8 +455,8 @@ const Actividad = () => {
 
                           {/* Acciones (dots button) */}
                           <td style={{ textAlign: 'center' }}>
-                            <button 
-                              className="btn-action-more-monitoreo" 
+                            <button
+                              className="btn-action-more-monitoreo"
                               onClick={() => navigate(`/actividad/${user.id}`)}
                               title="Ver Detalle"
                             >

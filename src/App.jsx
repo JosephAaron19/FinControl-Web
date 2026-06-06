@@ -7,6 +7,8 @@ import Actividad from './pages/Actividad';
 import ActividadDetalle from './pages/ActividadDetalle';
 import GestionJornada from './pages/GestionJornada';
 import HistorialJornadas from './pages/HistorialJornadas';
+import PoliticaPrivacidad from './pages/PoliticaPrivacidad';
+import EliminacionDatos from './pages/EliminacionDatos';
 import { NotificationProvider } from './context/NotificationContext';
 
 // Componente para proteger rutas según el rol
@@ -34,6 +36,8 @@ function App() {
         <div className="app-container">
           <Routes>
             <Route path="/login" element={<Login />} />
+            <Route path="/politica-privacidad" element={<PoliticaPrivacidad />} />
+            <Route path="/eliminacion-datos" element={<EliminacionDatos />} />
             
             {/* Rutas Administrativas (Solo Admin/Gerente) */}
             <Route path="/dashboard" element={

@@ -1,22 +1,22 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  Plus, 
-  Edit2, 
-  Trash2, 
-  MapPin, 
-  X, 
-  Search, 
-  SlidersHorizontal, 
-  Download, 
-  Eye, 
-  Building2, 
-  CheckCircle2, 
-  Target, 
-  Radio, 
-  Calendar, 
-  ChevronLeft, 
-  ChevronRight, 
+import {
+  Plus,
+  Edit2,
+  Trash2,
+  MapPin,
+  X,
+  Search,
+  SlidersHorizontal,
+  Download,
+  Eye,
+  Building2,
+  CheckCircle2,
+  Target,
+  Radio,
+  Calendar,
+  ChevronLeft,
+  ChevronRight,
   Map,
   Hash,
   FileText,
@@ -29,7 +29,7 @@ import MainLayout from '../layouts/MainLayout';
 import { useNotification } from '../context/NotificationContext';
 import './Sedes.css';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
+const API_URL = import.meta.env.VITE_API_URL || 'https://apifincontrol.finatech.com.pe/api';
 
 const darkMapStyle = [
   { elementType: 'geometry', stylers: [{ color: '#0f172a' }] },
@@ -489,7 +489,7 @@ const Sedes = () => {
     if (!leafletMapInstanceRef.current) {
       // Find initial coordinate center from existing sedes or default Jaén
       const centerSede = sedes.find(s => s.latitud && s.longitud) || { latitud: -5.70770574, longitud: -78.80942970 };
-      
+
       const map = window.L.map(leafletMapRef.current, {
         center: [parseFloat(centerSede.latitud), parseFloat(centerSede.longitud)],
         zoom: 14,
@@ -517,10 +517,10 @@ const Sedes = () => {
     // Add markers and circles for all filtered sedes
     const activeFilteredSedes = sedes.filter(s => {
       const matchesSearch = s.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                            (s.direccion || '').toLowerCase().includes(searchTerm.toLowerCase());
+        (s.direccion || '').toLowerCase().includes(searchTerm.toLowerCase());
       const matchesStatus = statusFilter === 'Todos' ||
-                            (statusFilter === 'Activos' && s.activo) ||
-                            (statusFilter === 'Inactivos' && !s.activo);
+        (statusFilter === 'Activos' && s.activo) ||
+        (statusFilter === 'Inactivos' && !s.activo);
       return matchesSearch && matchesStatus;
     });
 
@@ -656,13 +656,13 @@ const Sedes = () => {
       const day = date.getDate();
       const month = months[date.getMonth()];
       const year = date.getFullYear();
-      
+
       let hours = date.getHours();
       const minutes = date.getMinutes().toString().padStart(2, '0');
       const ampm = hours >= 12 ? 'p. m.' : 'a. m.';
       hours = hours % 12;
       hours = hours ? hours : 12;
-      
+
       return `${day} ${month} ${year} ${hours}:${minutes} ${ampm}`;
     } catch (e) {
       return '-';
@@ -672,16 +672,16 @@ const Sedes = () => {
   // Filter Logic
   const filteredSedesList = sedes.filter(sede => {
     const matchesSearch = sede.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          (sede.direccion || '').toLowerCase().includes(searchTerm.toLowerCase());
-    
+      (sede.direccion || '').toLowerCase().includes(searchTerm.toLowerCase());
+
     const matchesStatus = statusFilter === 'Todos' ||
-                          (statusFilter === 'Activos' && sede.activo) ||
-                          (statusFilter === 'Inactivos' && !sede.activo);
-      
+      (statusFilter === 'Activos' && sede.activo) ||
+      (statusFilter === 'Inactivos' && !sede.activo);
+
     const matchesRadio = radioFilter === 'Todos' ||
-                         (radioFilter === 'menor_30' && (sede.radio_metros || 0) < 30) ||
-                         (radioFilter === 'mayor_30' && (sede.radio_metros || 0) >= 30);
-      
+      (radioFilter === 'menor_30' && (sede.radio_metros || 0) < 30) ||
+      (radioFilter === 'mayor_30' && (sede.radio_metros || 0) >= 30);
+
     return matchesSearch && matchesStatus && matchesRadio;
   });
 
@@ -695,8 +695,8 @@ const Sedes = () => {
   // KPIs Calculations
   const totalSedesCount = sedes.length;
   const activeSedesCount = sedes.filter(s => s.activo).length;
-  const averageRadius = totalSedesCount > 0 
-    ? Math.round(sedes.reduce((acc, s) => acc + (s.radio_metros || 0), 0) / totalSedesCount) 
+  const averageRadius = totalSedesCount > 0
+    ? Math.round(sedes.reduce((acc, s) => acc + (s.radio_metros || 0), 0) / totalSedesCount)
     : 0;
   const radiosConfiguredCount = sedes.filter(s => s.radio_metros > 0).length;
 
@@ -709,7 +709,7 @@ const Sedes = () => {
       subtitle="Administra las sucursales y sus zonas geográficas."
     >
       <div className="flex flex-col gap-6 w-full animate-in select-none">
-        
+
         {/* Filters Toolbar */}
         <div className="flex flex-wrap gap-4 items-center justify-between bg-white border border-slate-100 p-4 rounded-2xl shadow-sm">
           <div className="flex flex-wrap gap-3 items-center flex-1 min-w-0">
@@ -828,11 +828,11 @@ const Sedes = () => {
 
         {/* 2-Column Split Content */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full">
-          
+
           {/* Left Column: Sedes List */}
           <div className="lg:col-span-8 flex flex-col gap-4">
             <div className="bg-white border border-slate-100 shadow-sm rounded-2xl overflow-hidden flex flex-col">
-              
+
               {/* Header inside Card */}
               <div className="flex items-center justify-between border-b border-slate-100 p-5">
                 <div className="flex items-center gap-2">
@@ -896,11 +896,10 @@ const Sedes = () => {
                               {sede.radio_metros} m
                             </td>
                             <td className="p-4 text-xs">
-                              <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                                sede.activo 
-                                  ? 'bg-emerald-50 text-emerald-500' 
+                              <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${sede.activo
+                                  ? 'bg-emerald-50 text-emerald-500'
                                   : 'bg-rose-50 text-rose-500'
-                              }`}>
+                                }`}>
                                 <span className={`w-1.5 h-1.5 rounded-full ${sede.activo ? 'bg-emerald-500' : 'bg-rose-500'}`} />
                                 {sede.activo ? 'ACTIVO' : 'INACTIVO'}
                               </span>
@@ -949,7 +948,7 @@ const Sedes = () => {
                 <span className="text-[10px] font-bold text-slate-400">
                   Mostrando {totalItems > 0 ? indexOfFirstItem + 1 : 0} a {Math.min(indexOfLastItem, totalItems)} de {totalItems} sedes
                 </span>
-                
+
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-1.5">
                     <select
@@ -1021,7 +1020,7 @@ const Sedes = () => {
                 </span>
                 <span className="font-extrabold text-slate-800">{activeSedesCount}</span>
               </div>
-              
+
               <div className="flex items-center justify-between text-xs">
                 <span className="flex items-center gap-2 font-bold text-slate-500">
                   <span className="w-2 h-2 rounded-full bg-[#2563eb]" />
@@ -1036,7 +1035,7 @@ const Sedes = () => {
                   Última actualización
                 </span>
                 <span className="font-extrabold text-slate-800">
-                  {sedes.length > 0 
+                  {sedes.length > 0
                     ? new Date(Math.max(...sedes.map(s => new Date(s.actualizado_at || s.creado_at)))).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })
                     : '-'
                   }
@@ -1045,8 +1044,8 @@ const Sedes = () => {
             </div>
 
             {/* Bottom map link */}
-            <button 
-              onClick={() => navigate('/actividad')} 
+            <button
+              onClick={() => navigate('/actividad')}
               className="mt-auto pt-3 border-t border-slate-100 text-left text-[10px] font-extrabold text-[#2563eb] hover:text-[#1d4ed8] flex items-center justify-between w-full"
             >
               <span>Ver cobertura en mapa completo</span>
@@ -1272,7 +1271,7 @@ const Sedes = () => {
                                         latitud: lat.toFixed(8),
                                         longitud: lng.toFixed(8)
                                       }));
-                                      
+
                                       const geocoder = new window.google.maps.Geocoder();
                                       geocoder.geocode({ location: pos }, (results, status) => {
                                         if (status === 'OK' && results[0]) {
@@ -1301,7 +1300,7 @@ const Sedes = () => {
                             </div>
                           )}
                           <div ref={mapContainerRef} className="map-canvas" />
-                          
+
                           {/* Floating Radio Tolerance Banner */}
                           <div className="map-overlay-banner">
                             <div className="map-overlay-banner-left">
