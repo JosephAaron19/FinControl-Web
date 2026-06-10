@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LogOut, LayoutDashboard, Users, Activity, Settings, MapPin, Calendar, X } from 'lucide-react';
+import { LogOut, LayoutDashboard, Users, Activity, Settings, MapPin, Calendar, X, Building2 } from 'lucide-react';
 import './Sidebar.css';
 
 const Sidebar = ({ isOpen, onClose }) => {
@@ -37,9 +37,13 @@ const Sidebar = ({ isOpen, onClose }) => {
                 <LayoutDashboard size={20} />
                 <span>Dashboard</span>
               </NavLink>
+              <NavLink to="/sedes-centrales" onClick={onClose} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+                <Building2 size={20} />
+                <span>Sedes Centrales</span>
+              </NavLink>
               <NavLink to="/sedes" onClick={onClose} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
                 <MapPin size={20} />
-                <span>Sedes</span>
+                <span>Sedes Operativas</span>
               </NavLink>
               <NavLink to="/usuarios" onClick={onClose} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
                 <Users size={20} />

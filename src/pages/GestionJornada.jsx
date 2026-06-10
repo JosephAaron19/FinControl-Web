@@ -39,7 +39,7 @@ import MainLayout from '../layouts/MainLayout';
 import { useNotification } from '../context/NotificationContext';
 import './GestionJornada.css';
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://apifincontrol.finatech.com.pe/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
 
 const getLocalDateString = () => {
   const d = new Date();
@@ -82,6 +82,8 @@ const GestionJornada = () => {
   const [selectedSede, setSelectedSede] = useState(null); // Sede object or null
   const [sedesResumen, setSedesResumen] = useState([]);
   const [loadingResumen, setLoadingResumen] = useState(true);
+  const [sedeCentralSearchTerm, setSedeCentralSearchTerm] = useState('');
+  const [expandedCentrales, setExpandedCentrales] = useState({});
 
   // Level 2 data
   const [activeTab, setActiveTab] = useState('horarios'); // 'horarios' | 'con_horario' | 'sin_horario' | 'intercambios'
@@ -221,12 +223,19 @@ const GestionJornada = () => {
       return;
     }
     try {
-      const res = await fetch(`${API_URL}/sedes/resumen/`, {
+      const res = await fetch(`${API_URL}/gestion-jornada/sedes-agrupadas/`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {
         const data = await res.json();
         setSedesResumen(data);
+        
+        // Expand all by default
+        const initialExpanded = {};
+        data.forEach(c => {
+          initialExpanded[c.id || 'sin_asignar'] = true;
+        });
+        setExpandedCentrales(initialExpanded);
       } else {
         showNotification('Error al cargar resumen de sedes', 'error');
       }
@@ -931,16 +940,27 @@ const GestionJornada = () => {
       {!selectedSede ? (
         // ================= LEVEL 1: SEDES GRID =================
         <div className="sedes-overview">
-          <div className="panel-header-box">
+          <div className="panel-header-box mb-6">
             <div className="panel-header-icon-container">
               <Building size={22} />
             </div>
-            <h2>Panel General por Sedes</h2>
+            <h2>Panel General por Sedes Centrales</h2>
           </div>
 
-          <div className="panel-info-banner">
+          <div className="panel-info-banner mb-6">
             <Info size={16} className="info-icon" />
-            <span>Seleccione una sede para gestionar sus turnos, horarios y auditar intercambios.</span>
+            <span>Selecciona una sede central y luego una sede operativa para gestionar horarios, jornadas y asignaciones.</span>
+          </div>
+
+          <div className="relative mb-8 max-w-lg">
+            <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Buscar sede central u operativa..."
+              value={sedeCentralSearchTerm}
+              onChange={(e) => setSedeCentralSearchTerm(e.target.value)}
+              className="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 outline-none focus:border-sky-500 focus:ring-4 focus:ring-sky-50 transition"
+            />
           </div>
 
           {loadingResumen ? (
@@ -954,68 +974,115 @@ const GestionJornada = () => {
               <p>No tienes sedes asignadas o creadas para configurar.</p>
             </div>
           ) : (
-            <div className="sedes-grid">
-              {sedesResumen.map(sede => (
-                <div key={sede.sede_id} className="sede-card-premium">
-                  <div className="sede-card-content">
-                    <div className="sede-header-premium">
-                      <div className="sede-header-left">
-                        <div className="sede-icon-bg">
-                          <MapPin size={18} />
-                        </div>
-                        <h3 className="sede-title-premium">{sede.sede_nombre}</h3>
-                      </div>
-                    </div>
+            <div className="flex flex-col gap-6">
+              {sedesResumen.map(central => {
+                // Filtro: buscar en central o en sus sedes
+                const search = sedeCentralSearchTerm.toLowerCase();
+                const matchesCentral = central.nombre?.toLowerCase().includes(search);
+                const sedesFiltradas = central.sedes?.filter(s => 
+                  s.sede_nombre?.toLowerCase().includes(search) || 
+                  s.direccion?.toLowerCase().includes(search)
+                ) || [];
+                
+                if (search && !matchesCentral && sedesFiltradas.length === 0) {
+                  return null; // Ocultar si no coincide ni la central ni sus sedes
+                }
+                
+                const sedesAMostrar = search && !matchesCentral ? sedesFiltradas : central.sedes;
+                const centralIdKey = central.id || 'sin_asignar';
+                const isExpanded = expandedCentrales[centralIdKey];
 
-                    <div className="sede-metrics-grid">
-                      <div className="metric-box">
-                        <div className="metric-icon-bg">
-                          <Calendar size={18} />
-                        </div>
-                        <div className="metric-info">
-                          <span className="metric-value">{sede.horarios_creados}</span>
-                          <span className="metric-label">Horarios creados</span>
-                        </div>
-                      </div>
-                      <div className="metric-box">
-                        <div className="metric-icon-bg">
-                          <User size={18} />
-                        </div>
-                        <div className="metric-info">
-                          <span className="metric-value">{sede.usuarios_con_horario}</span>
-                          <span className="metric-label">Usuarios c/ horario</span>
-                        </div>
-                      </div>
-                      <div className="metric-box">
-                        <div className="metric-icon-bg">
-                          <Users size={18} />
-                        </div>
-                        <div className="metric-info">
-                          <span className="metric-value">{sede.usuarios_sin_horario}</span>
-                          <span className="metric-label">Usuarios s/ horario</span>
-                        </div>
-                      </div>
-                      <div className="metric-box">
-                        <div className="metric-icon-bg">
-                          <RefreshCw size={18} />
-                        </div>
-                        <div className="metric-info">
-                          <span className="metric-value">{sede.intercambios_count}</span>
-                          <span className="metric-label">Intercambios aprob.</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <button
-                      className="btn-premium-action mt-6 w-full"
-                      onClick={() => handleSelectSede(sede)}
+                return (
+                  <div key={centralIdKey} className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                    {/* Cabecera de la Sede Central */}
+                    <div 
+                      className="px-6 py-4 flex items-center justify-between cursor-pointer hover:bg-slate-50 transition"
+                      onClick={() => setExpandedCentrales(prev => ({ ...prev, [centralIdKey]: !isExpanded }))}
                     >
-                      <span>Gestionar Horarios</span>
-                      <ArrowRight size={16} />
-                    </button>
+                      <div className="flex items-center gap-4">
+                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${central.id ? 'bg-[#ebf5ff] text-[#2563eb]' : 'bg-slate-100 text-slate-500'}`}>
+                          <Building size={22} />
+                        </div>
+                        <div>
+                          <h3 className="text-base font-bold text-slate-800">{central.nombre}</h3>
+                          <div className="flex items-center gap-3 mt-1.5">
+                            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">{central.total_sedes} sedes operativas</span>
+                            {central.id && (
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${central.estado ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                                {central.estado ? 'ACTIVO' : 'INACTIVO'}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-slate-400 p-2 rounded-lg hover:bg-slate-100 transition">
+                        {isExpanded ? <ChevronDown size={20} className="transform rotate-180 transition-transform" /> : <ChevronDown size={20} className="transition-transform" />}
+                      </div>
+                    </div>
+
+                    {/* Lista de Sedes Operativas */}
+                    {isExpanded && (
+                      <div className="p-6 bg-slate-50/50 border-t border-slate-100">
+                        {sedesAMostrar.length === 0 ? (
+                          <div className="text-sm text-slate-500 text-center py-6 bg-white rounded-xl border border-dashed border-slate-200">
+                            Esta sede central aún no tiene sedes operativas asociadas.
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                            {sedesAMostrar.map(sede => (
+                              <div key={sede.sede_id} className="bg-white border border-slate-200 rounded-xl p-5 hover:border-sky-300 hover:shadow-md hover:-translate-y-0.5 transition-all flex flex-col justify-between">
+                                <div>
+                                  <div className="flex items-start gap-3 mb-4">
+                                    <div className="mt-0.5 text-[#2563eb]">
+                                      <MapPin size={18} />
+                                    </div>
+                                    <div>
+                                      <h4 className="text-sm font-bold text-slate-800 leading-tight" title={sede.sede_nombre}>{sede.sede_nombre}</h4>
+                                      <span className={`inline-block mt-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold ${sede.activo ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                                        {sede.activo ? 'ACTIVO' : 'INACTIVO'}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-2 mb-5">
+                                    <div className="flex flex-col bg-slate-50 border border-slate-100 p-2.5 rounded-lg">
+                                      <span className="text-[10px] font-bold text-slate-400 uppercase">Personal</span>
+                                      <span className="text-lg font-black text-slate-700">{sede.usuarios_con_horario + sede.usuarios_sin_horario}</span>
+                                    </div>
+                                    <div className="flex flex-col bg-slate-50 border border-slate-100 p-2.5 rounded-lg">
+                                      <span className="text-[10px] font-bold text-slate-400 uppercase">Horarios</span>
+                                      <span className="text-lg font-black text-slate-700">{sede.horarios_creados}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                                <button
+                                  className="w-full py-2.5 bg-white border-2 border-[#2563eb] text-[#2563eb] text-xs font-bold rounded-xl hover:bg-[#2563eb] hover:text-white transition-colors flex items-center justify-center gap-2"
+                                  onClick={() => handleSelectSede(sede)}
+                                >
+                                  Gestionar
+                                  <ArrowRight size={14} />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
+                );
+              })}
+              
+              {/* Mensaje de no resultados */}
+              {sedesResumen.length > 0 && sedeCentralSearchTerm && !sedesResumen.some(central => {
+                const search = sedeCentralSearchTerm.toLowerCase();
+                const matchesCentral = central.nombre?.toLowerCase().includes(search);
+                const sedesFiltradas = central.sedes?.filter(s => s.sede_nombre?.toLowerCase().includes(search) || s.direccion?.toLowerCase().includes(search)) || [];
+                return matchesCentral || sedesFiltradas.length > 0;
+              }) && (
+                <div className="text-center py-12 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                  <Search size={32} className="mx-auto text-slate-300 mb-3" />
+                  <p className="text-slate-500 font-medium">No se encontraron sedes relacionadas con "{sedeCentralSearchTerm}".</p>
                 </div>
-              ))}
+              )}
             </div>
           )}
         </div>

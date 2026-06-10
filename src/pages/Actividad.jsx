@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   User,
@@ -20,7 +20,7 @@ import MainLayout from '../layouts/MainLayout';
 import useWebSockets from '../hooks/useWebSockets';
 import './Actividad.css';
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://apifincontrol.finatech.com.pe/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
 
 const getInitials = (name) => {
   if (!name) return 'U';
@@ -47,6 +47,56 @@ const getAvatarTheme = (name) => {
   return colors[sum % colors.length];
 };
 
+const CustomSelect = ({ value, onChange, options, placeholder, icon: Icon, disabled }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const selectRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (selectRef.current && !selectRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const selectedLabel = value || placeholder;
+
+  return (
+    <div className={`custom-select-wrapper-monitoreo ${disabled ? 'opacity-50 pointer-events-none' : ''}`} ref={selectRef}>
+      <div 
+        className={`filter-pill-select-wrapper-monitoreo custom-select-trigger ${isOpen ? 'active' : ''}`} 
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+      >
+        <Icon size={15} className="filter-pill-icon-blue" />
+        <span className="custom-select-text">{selectedLabel}</span>
+        <ChevronDown size={14} className={`filter-pill-chevron transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+      </div>
+      
+      {isOpen && (
+        <div className="custom-select-dropdown">
+          <div 
+            className={`custom-select-option ${!value ? 'selected' : ''}`}
+            onClick={() => { onChange(''); setIsOpen(false); }}
+          >
+            {placeholder}
+          </div>
+          {options.map((opt, idx) => (
+            <div 
+              key={idx}
+              className={`custom-select-option ${value === opt ? 'selected' : ''}`}
+              onClick={() => { onChange(opt); setIsOpen(false); }}
+            >
+              {opt}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const Actividad = () => {
   const navigate = useNavigate();
   const [actividades, setActividades] = useState([]);
@@ -56,7 +106,9 @@ const Actividad = () => {
 
   // Filter & Search states
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCentral, setSelectedCentral] = useState('');
   const [selectedSede, setSelectedSede] = useState('');
+  const [selectedRol, setSelectedRol] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
 
   const fetchProfile = async () => {
@@ -129,12 +181,31 @@ const Actividad = () => {
   const filteredActividades = actividades.filter(a => {
     const nameMatch = (a.nombre_completo || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (a.dni || '').toLowerCase().includes(searchTerm.toLowerCase());
+      
+    const centralName = a.sede_info?.sede_central_nombre || 'Sin asignar';
+    const centralMatch = !selectedCentral || centralName === selectedCentral;
+    
     const sedeMatch = !selectedSede || a.sede === selectedSede;
-    return nameMatch && sedeMatch;
+    
+    const rolName = (a.rol_info?.nombre || a.cargo || '').toUpperCase();
+    const rolMatch = !selectedRol || rolName === selectedRol;
+    
+    return nameMatch && centralMatch && sedeMatch && rolMatch;
   });
 
-  // Lista de sedes únicas presentes en el listado para poblar el filtro
-  const uniqueSedes = Array.from(new Set(actividades.map(a => a.sede).filter(Boolean)));
+  // Listas de opciones únicas para los filtros en cascada
+  const uniqueCentrales = Array.from(new Set(actividades.map(a => a.sede_info?.sede_central_nombre || 'Sin asignar'))).sort();
+  
+  const uniqueSedes = Array.from(new Set(actividades
+    .filter(a => !selectedCentral || (a.sede_info?.sede_central_nombre || 'Sin asignar') === selectedCentral)
+    .map(a => a.sede)
+    .filter(Boolean))).sort();
+    
+  const uniqueRoles = Array.from(new Set(actividades
+    .filter(a => !selectedCentral || (a.sede_info?.sede_central_nombre || 'Sin asignar') === selectedCentral)
+    .filter(a => !selectedSede || a.sede === selectedSede)
+    .map(a => (a.rol_info?.nombre || a.cargo || '').toUpperCase())
+    .filter(Boolean))).sort();
 
   // Paginación local
   const itemsPerPage = 10;
@@ -146,7 +217,7 @@ const Actividad = () => {
   // Resetear página actual si cambian los filtros
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, selectedSede]);
+  }, [searchTerm, selectedCentral, selectedSede, selectedRol]);
 
   // Cálculos para las tarjetas de resumen
   const totalOperativos = actividades.length;
@@ -259,21 +330,41 @@ const Actividad = () => {
                   <ChevronDown size={14} className="filter-pill-chevron" />
                 </div>
 
+                {/* Filtro Central */}
+                <CustomSelect
+                  value={selectedCentral}
+                  onChange={(val) => {
+                    setSelectedCentral(val);
+                    setSelectedSede('');
+                    setSelectedRol('');
+                  }}
+                  options={uniqueCentrales}
+                  placeholder="Sedes Centrales"
+                  icon={Building}
+                />
+
                 {/* Filtro Sede */}
-                <div className="filter-pill-select-wrapper-monitoreo">
-                  <Building size={15} className="filter-pill-icon-blue" />
-                  <select
-                    value={selectedSede}
-                    onChange={(e) => setSelectedSede(e.target.value)}
-                    className="filter-pill-select-monitoreo"
-                  >
-                    <option value="">Todas las sedes</option>
-                    {uniqueSedes.map((sede, idx) => (
-                      <option key={idx} value={sede}>{sede}</option>
-                    ))}
-                  </select>
-                  <ChevronDown size={14} className="filter-pill-chevron" />
-                </div>
+                <CustomSelect
+                  value={selectedSede}
+                  onChange={(val) => {
+                    setSelectedSede(val);
+                    setSelectedRol('');
+                  }}
+                  options={uniqueSedes}
+                  placeholder="Sedes Operativas"
+                  icon={MapPin}
+                  disabled={!selectedCentral && uniqueSedes.length === 0}
+                />
+
+                {/* Filtro Rol */}
+                <CustomSelect
+                  value={selectedRol}
+                  onChange={(val) => setSelectedRol(val)}
+                  options={uniqueRoles}
+                  placeholder="Todos los roles"
+                  icon={User}
+                  disabled={uniqueRoles.length === 0}
+                />
 
                 {/* Buscador */}
                 <div className="search-bar-wrapper-monitoreo">

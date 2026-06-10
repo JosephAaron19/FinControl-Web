@@ -3,6 +3,8 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Sedes from './pages/Sedes';
 import Usuarios from './pages/Usuarios';
+import SedesCentrales from './pages/SedesCentrales';
+import SedesCentralesDetalle from './pages/SedesCentralesDetalle';
 import Actividad from './pages/Actividad';
 import ActividadDetalle from './pages/ActividadDetalle';
 import GestionJornada from './pages/GestionJornada';
@@ -48,6 +50,16 @@ function App() {
             <Route path="/sedes" element={
               <ProtectedRoute>
                 <Sedes />
+              </ProtectedRoute>
+            } />
+            <Route path="/sedes-centrales" element={
+              <ProtectedRoute>
+                <SedesCentrales />
+              </ProtectedRoute>
+            } />
+            <Route path="/sedes-centrales/:id" element={
+              <ProtectedRoute>
+                <SedesCentralesDetalle />
               </ProtectedRoute>
             } />
             <Route path="/usuarios" element={

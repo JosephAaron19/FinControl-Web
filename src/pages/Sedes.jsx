@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Plus,
   Edit2,
@@ -29,7 +29,7 @@ import MainLayout from '../layouts/MainLayout';
 import { useNotification } from '../context/NotificationContext';
 import './Sedes.css';
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://apifincontrol.finatech.com.pe/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
 
 const darkMapStyle = [
   { elementType: 'geometry', stylers: [{ color: '#0f172a' }] },
@@ -114,6 +114,7 @@ const darkMapStyle = [
 
 const Sedes = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { showNotification, showConfirm } = useNotification();
   const [sedes, setSedes] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -138,7 +139,8 @@ const Sedes = () => {
     latitud: '',
     longitud: '',
     radio_metros: 100,
-    activo: true
+    activo: true,
+    sede_central_id: ''
   });
 
   const [mapsLoaded, setMapsLoaded] = useState(false);
@@ -209,6 +211,8 @@ const Sedes = () => {
     document.head.appendChild(script);
   }, []);
 
+  const [sedesCentrales, setSedesCentrales] = useState([]);
+
   const fetchSedes = async () => {
     const token = localStorage.getItem('access_token');
     if (!token) {
@@ -231,9 +235,52 @@ const Sedes = () => {
     }
   };
 
+  const fetchSedesCentrales = async () => {
+    const token = localStorage.getItem('access_token');
+    try {
+      const res = await fetch(`${API_URL}/sedes-centrales/`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSedesCentrales(data);
+      }
+    } catch (err) {
+      console.error('Error fetching sedes centrales:', err);
+    }
+  };
+
   useEffect(() => {
     fetchSedes();
+    fetchSedesCentrales();
   }, [navigate]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('create') === 'true') {
+      const sedeCentralId = parseInt(params.get('sede_central_id'));
+
+      // Need to defer slightly to ensure fetch is done or just set state
+      setIsViewMode(false);
+      setCurrentSede(null);
+      setFormData({
+        nombre: '',
+        codigo: '',
+        direccion: '',
+        referencia: '',
+        latitud: '',
+        longitud: '',
+        radio_metros: 100,
+        activo: true,
+        sede_central_id: sedeCentralId || ''
+      });
+      setSearchInputValue('');
+      setIsModalOpen(true);
+
+      // Clear URL params
+      navigate('/sedes', { replace: true });
+    }
+  }, [location.search, navigate]);
 
   const handleOpenModal = (sede = null) => {
     if (sede) {
@@ -246,7 +293,8 @@ const Sedes = () => {
         latitud: sede.latitud || '',
         longitud: sede.longitud || '',
         radio_metros: sede.radio_metros || '',
-        activo: sede.activo
+        activo: sede.activo,
+        sede_central_id: sede.sede_central_id || ''
       });
       setSearchInputValue(sede.direccion || '');
     } else {
@@ -259,7 +307,8 @@ const Sedes = () => {
         latitud: '',
         longitud: '',
         radio_metros: 100,
-        activo: true
+        activo: true,
+        sede_central_id: ''
       });
       setSearchInputValue('');
     }
@@ -591,6 +640,7 @@ const Sedes = () => {
       if (payload.radio_metros === '') payload.radio_metros = null;
       if (payload.codigo === '') payload.codigo = null;
       if (payload.referencia === '') payload.referencia = null;
+      if (payload.sede_central_id === '') payload.sede_central_id = null;
 
       const res = await fetch(url, {
         method,
@@ -851,6 +901,7 @@ const Sedes = () => {
                   <thead>
                     <tr className="border-b border-slate-100 bg-slate-50/50">
                       <th className="p-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Nombre</th>
+                      <th className="p-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Sede Central</th>
                       <th className="p-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Dirección</th>
                       <th className="p-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Coordenadas</th>
                       <th className="p-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Radio</th>
@@ -862,13 +913,13 @@ const Sedes = () => {
                   <tbody className="divide-y divide-slate-100">
                     {loading ? (
                       <tr>
-                        <td colSpan="7" className="p-8 text-center text-xs font-semibold text-slate-400">
+                        <td colSpan="8" className="p-8 text-center text-xs font-semibold text-slate-400">
                           Cargando sedes...
                         </td>
                       </tr>
                     ) : currentItems.length === 0 ? (
                       <tr>
-                        <td colSpan="7" className="p-8 text-center text-xs font-semibold text-slate-400">
+                        <td colSpan="8" className="p-8 text-center text-xs font-semibold text-slate-400">
                           No se encontraron sedes.
                         </td>
                       </tr>
@@ -885,6 +936,9 @@ const Sedes = () => {
                                 {sede.nombre}
                               </div>
                             </td>
+                            <td className="p-4 text-xs font-semibold text-slate-500">
+                              {sede.sede_central_nombre || 'Sin asignar'}
+                            </td>
                             <td className="p-4 text-xs font-medium text-slate-500">
                               <div>{addr.line1}</div>
                               {addr.line2 && <div className="text-[10px] text-slate-400 mt-0.5">{addr.line2}</div>}
@@ -897,8 +951,8 @@ const Sedes = () => {
                             </td>
                             <td className="p-4 text-xs">
                               <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${sede.activo
-                                  ? 'bg-emerald-50 text-emerald-500'
-                                  : 'bg-rose-50 text-rose-500'
+                                ? 'bg-emerald-50 text-emerald-500'
+                                : 'bg-rose-50 text-rose-500'
                                 }`}>
                                 <span className={`w-1.5 h-1.5 rounded-full ${sede.activo ? 'bg-emerald-500' : 'bg-rose-500'}`} />
                                 {sede.activo ? 'ACTIVO' : 'INACTIVO'}
@@ -1112,6 +1166,27 @@ const Sedes = () => {
                           placeholder="# 002"
                         />
                       </div>
+                    </div>
+                  </div>
+
+                  <div className="form-group">
+                    <label>Sede Central <span className="text-slate-400 font-normal">(Opcional)</span></label>
+                    <div className="relative input-wrapper">
+                      <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                      <select
+                        name="sede_central_id"
+                        value={formData.sede_central_id || ''}
+                        onChange={handleInputChange}
+                        disabled={isViewMode}
+                        className="input-field pl-9 appearance-none"
+                      >
+                        <option value="">Sin asignar</option>
+                        {sedesCentrales.filter(sc => sc.estado || sc.id === formData.sede_central_id).map(sc => (
+                          <option key={sc.id} value={sc.id}>
+                            {sc.nombre}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                   </div>
 
