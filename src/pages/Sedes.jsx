@@ -221,7 +221,7 @@ const Sedes = () => {
     }
 
     try {
-      const res = await fetch(`${API_URL}/sedes/`, {
+      const res = await fetch(`${API_URL}/sedes/?_t=${Date.now()}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {
@@ -238,7 +238,7 @@ const Sedes = () => {
   const fetchSedesCentrales = async () => {
     const token = localStorage.getItem('access_token');
     try {
-      const res = await fetch(`${API_URL}/sedes-centrales/`, {
+      const res = await fetch(`${API_URL}/sedes-centrales/?_t=${Date.now()}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {
@@ -652,7 +652,10 @@ const Sedes = () => {
       });
 
       if (res.ok) {
-        fetchSedes();
+        setSearchTerm('');
+        setStatusFilter('Todos');
+        setRadioFilter('Todos');
+        await fetchSedes();
         handleCloseModal();
         showNotification(currentSede ? 'Sede actualizada correctamente.' : 'Sede creada correctamente.', 'success');
       } else {
@@ -676,7 +679,7 @@ const Sedes = () => {
       });
 
       if (res.ok) {
-        fetchSedes();
+        await fetchSedes();
         showNotification('Sede eliminada correctamente.', 'success');
       } else {
         showNotification('Error al eliminar la sede.', 'error');

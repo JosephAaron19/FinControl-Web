@@ -111,14 +111,8 @@ const mockFallbackData = {
 // CUSTOM SVG LINE CHART COMPONENT
 // ==========================================
 const LineChart = ({ data = [] }) => {
-  const hasRealValues = data && data.length > 0 && data.some(d => {
-    const val = d.fecha ? ((d.completa || 0) + (d.incompleta || 0)) : d.value;
-    return val > 0;
-  });
-  const chartData = hasRealValues ? data : mockFallbackData.graficos.asistencia_por_dia_semana;
-
-  // Normalize API format vs Mock format
-  const normalizedData = chartData.map(d => {
+  // Normalize API format
+  const normalizedData = data.map(d => {
     if (d.fecha) {
       const val = (d.completa || 0) + (d.incompleta || 0);
       const date = new Date(d.fecha + 'T00:00:00');
@@ -129,7 +123,7 @@ const LineChart = ({ data = [] }) => {
   });
 
   const values = normalizedData.map(d => d.value);
-  const maxVal = Math.max(...values, 200);
+  const maxVal = Math.max(...values, 10);
   const minVal = 0;
 
   const svgWidth = 500;
@@ -143,7 +137,7 @@ const LineChart = ({ data = [] }) => {
   const chartHeight = svgHeight - paddingTop - paddingBottom;
 
   const points = normalizedData.map((d, i) => {
-    const x = paddingLeft + (i * (chartWidth / (normalizedData.length - 1)));
+    const x = paddingLeft + (i * (chartWidth / Math.max(1, normalizedData.length - 1)));
     const y = svgHeight - paddingBottom - ((d.value - minVal) / (maxVal - minVal)) * chartHeight;
     return { x, y, label: d.label, value: d.value };
   });
@@ -156,95 +150,105 @@ const LineChart = ({ data = [] }) => {
     ? `${linePath} L ${points[points.length - 1].x} ${svgHeight - paddingBottom} L ${points[0].x} ${svgHeight - paddingBottom} Z`
     : '';
 
-  const yTicks = [0, 50, 100, 150, 200];
+  // Calculate generic tick steps based on maxVal
+  const step = Math.ceil(maxVal / 4) || 1;
+  const yTicks = [0, step, step * 2, step * 3, step * 4];
 
   return (
     <div className="line-chart-container w-full h-full flex flex-col justify-between">
-      <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="w-full h-auto overflow-visible select-none">
-        <defs>
-          <linearGradient id="chartAreaGradient" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.25" />
-            <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.0" />
-          </linearGradient>
-        </defs>
+      {data.length === 0 ? (
+        <div className="text-xs font-semibold text-slate-400 py-20 text-center">
+          No hay datos de asistencia para el período.
+        </div>
+      ) : (
+        <>
+          <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="w-full h-auto overflow-visible select-none">
+            <defs>
+              <linearGradient id="chartAreaGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.25" />
+                <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.0" />
+              </linearGradient>
+            </defs>
 
-        {/* Grid lines */}
-        {yTicks.map((tick, i) => {
-          const y = svgHeight - paddingBottom - (tick / 200) * chartHeight;
-          return (
-            <g key={i}>
-              <line 
-                x1={paddingLeft} 
-                y1={y} 
-                x2={svgWidth - paddingRight} 
-                y2={y} 
-                stroke="rgba(15, 23, 42, 0.06)" 
-                strokeDasharray="4 4" 
+            {/* Grid lines */}
+            {yTicks.map((tick, i) => {
+              const y = svgHeight - paddingBottom - (tick / Math.max(1, maxVal)) * chartHeight;
+              return (
+                <g key={i}>
+                  <line 
+                    x1={paddingLeft} 
+                    y1={y} 
+                    x2={svgWidth - paddingRight} 
+                    y2={y} 
+                    stroke="rgba(15, 23, 42, 0.06)" 
+                    strokeDasharray="4 4" 
+                  />
+                  <text 
+                    x={paddingLeft - 10} 
+                    y={y + 4} 
+                    textAnchor="end" 
+                    className="text-[10px] fill-slate-400 font-bold"
+                  >
+                    {tick}
+                  </text>
+                </g>
+              );
+            })}
+
+            {/* Filled area */}
+            {areaPath && (
+              <path d={areaPath} fill="url(#chartAreaGradient)" />
+            )}
+
+            {/* Line */}
+            {linePath && (
+              <path 
+                d={linePath} 
+                fill="none" 
+                stroke="#2563eb" 
+                strokeWidth="3" 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
               />
-              <text 
-                x={paddingLeft - 10} 
-                y={y + 4} 
-                textAnchor="end" 
-                className="text-[10px] fill-slate-400 font-bold"
-              >
-                {tick}
-              </text>
-            </g>
-          );
-        })}
+            )}
 
-        {/* Filled area */}
-        {areaPath && (
-          <path d={areaPath} fill="url(#chartAreaGradient)" />
-        )}
-
-        {/* Line */}
-        {linePath && (
-          <path 
-            d={linePath} 
-            fill="none" 
-            stroke="#2563eb" 
-            strokeWidth="3" 
-            strokeLinecap="round" 
-            strokeLinejoin="round" 
-          />
-        )}
-
-        {/* Points & values */}
-        {points.map((p, i) => (
-          <g key={i} className="group cursor-pointer">
-            <circle 
-              cx={p.x} 
-              cy={p.y} 
-              r="4.5" 
-              fill="#2563eb" 
-              stroke="#ffffff" 
-              strokeWidth="2" 
-              className="transition-all duration-200 group-hover:r-[6px]"
-            />
-            <text 
-              x={p.x} 
-              y={p.y - 10} 
-              textAnchor="middle" 
-              className="text-[10px] font-extrabold fill-slate-700"
-            >
-              {p.value}
-            </text>
-            <text 
-              x={p.x} 
-              y={svgHeight - paddingBottom + 20} 
-              textAnchor="middle" 
-              className="text-[10px] fill-slate-450 font-bold"
-            >
-              {p.label}
-            </text>
-          </g>
-        ))}
-      </svg>
-      <div className="flex items-center justify-center gap-1.5 mt-2">
-        <span className="w-2 h-2 rounded-full bg-[#2563eb]" />
-        <span className="text-[10px] text-slate-400 font-bold">Asistencias</span>
-      </div>
+            {/* Points & values */}
+            {points.map((p, i) => (
+              <g key={i} className="group cursor-pointer">
+                <circle 
+                  cx={p.x} 
+                  cy={p.y} 
+                  r="4.5" 
+                  fill="#2563eb" 
+                  stroke="#ffffff" 
+                  strokeWidth="2" 
+                  className="transition-all duration-200 group-hover:r-[6px]"
+                />
+                <text 
+                  x={p.x} 
+                  y={p.y - 10} 
+                  textAnchor="middle" 
+                  className="text-[10px] font-extrabold fill-slate-700"
+                >
+                  {p.value}
+                </text>
+                <text 
+                  x={p.x} 
+                  y={svgHeight - paddingBottom + 20} 
+                  textAnchor="middle" 
+                  className="text-[10px] fill-slate-450 font-bold"
+                >
+                  {p.label}
+                </text>
+              </g>
+            ))}
+          </svg>
+          <div className="flex items-center justify-center gap-1.5 mt-2">
+            <span className="w-2 h-2 rounded-full bg-[#2563eb]" />
+            <span className="text-[10px] text-slate-400 font-bold">Asistencias</span>
+          </div>
+        </>
+      )}
     </div>
   );
 };
@@ -252,10 +256,8 @@ const LineChart = ({ data = [] }) => {
 // ==========================================
 // CUSTOM SVG DONUT CHART COMPONENT
 // ==========================================
-const DonutChart = ({ data = [], centerValue, centerLabel, fallbackData }) => {
-  const hasRealValues = data && data.length > 0 && data.some(d => (d.cantidad || 0) > 0);
-  const displayData = hasRealValues ? data : fallbackData;
-  const total = displayData ? displayData.reduce((sum, item) => sum + (item.cantidad || 0), 0) : 0;
+const DonutChart = ({ data = [], centerValue, centerLabel }) => {
+  const total = data ? data.reduce((sum, item) => sum + (item.cantidad || 0), 0) : 0;
   
   let accumulatedAngle = 0;
   const radius = 35;
@@ -268,7 +270,7 @@ const DonutChart = ({ data = [], centerValue, centerLabel, fallbackData }) => {
       <div className="relative w-28 h-28 flex-shrink-0">
         <svg viewBox="0 0 100 100" className="w-full h-full transform -rotate-90">
           <circle cx="50" cy="50" r={radius} fill="transparent" stroke="#f1f5f9" strokeWidth={strokeWidth} />
-          {displayData.map((item, idx) => {
+          {data.map((item, idx) => {
             const percentage = total > 0 ? (item.cantidad / total) * 100 : 0;
             const strokeLength = (percentage / 100) * circumference;
             const strokeOffset = circumference - strokeLength + (accumulatedAngle / 360) * circumference;
@@ -303,12 +305,12 @@ const DonutChart = ({ data = [], centerValue, centerLabel, fallbackData }) => {
       
       {/* Legends */}
       <div className="flex flex-col gap-2 min-w-0">
-        {displayData.map((item, idx) => {
+        {data.map((item, idx) => {
           const pct = total > 0 ? Math.round((item.cantidad / total) * 100) : 0;
           return (
             <div key={idx} className="flex items-center gap-2 text-[10px] font-semibold text-slate-500">
               <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }} />
-              <span className="truncate text-slate-600 font-medium w-24 text-left">{item.estado || item.tipo}</span>
+              <span className="truncate text-slate-650 font-medium w-24 text-left">{item.estado || item.tipo}</span>
               <span className="text-slate-800 font-bold ml-auto">{pct}%</span>
             </div>
           );
@@ -321,33 +323,37 @@ const DonutChart = ({ data = [], centerValue, centerLabel, fallbackData }) => {
 // ==========================================
 // CUSTOM HORIZONTAL PROGRESS BARS COMPONENT
 // ==========================================
-const HorizontalBarChart = ({ data = [], fallbackData }) => {
-  const hasRealValues = data && data.length > 0 && data.some(d => (d.cantidad || 0) > 0);
-  const chartData = hasRealValues ? data : (fallbackData || mockFallbackData.graficos.usuarios_por_sede);
-  const total = chartData.reduce((sum, item) => sum + (item.cantidad || 0), 0);
+const HorizontalBarChart = ({ data = [] }) => {
+  const total = data.reduce((sum, item) => sum + (item.cantidad || 0), 0);
 
   return (
     <div className="flex flex-col gap-4 w-full">
-      {chartData.map((item, idx) => {
-        const pct = item.porcentaje || (total > 0 ? Math.round((item.cantidad / total) * 100) : 0);
-        return (
-          <div key={idx} className="flex flex-col gap-1.5 w-full">
-            <div className="flex items-center justify-between text-xs font-semibold text-slate-700">
-              <span className="text-slate-700 font-medium truncate max-w-[150px]">{item.sede}</span>
-              <div className="flex items-center gap-3">
-                <span className="font-bold text-slate-900">{item.cantidad}</span>
-                <span className="text-slate-400 font-normal w-8 text-right">{pct}%</span>
+      {data.length === 0 ? (
+        <div className="text-xs font-semibold text-slate-400 py-8 text-center">
+          No hay usuarios registrados en sedes.
+        </div>
+      ) : (
+        data.map((item, idx) => {
+          const pct = item.porcentaje || (total > 0 ? Math.round((item.cantidad / total) * 100) : 0);
+          return (
+            <div key={idx} className="flex flex-col gap-1.5 w-full">
+              <div className="flex items-center justify-between text-xs font-semibold text-slate-700">
+                <span className="text-slate-700 font-medium truncate max-w-[150px]">{item.sede}</span>
+                <div className="flex items-center gap-3">
+                  <span className="font-bold text-slate-900">{item.cantidad}</span>
+                  <span className="text-slate-450 font-normal w-8 text-right">{pct}%</span>
+                </div>
+              </div>
+              <div className="h-2 bg-slate-100 rounded-full overflow-hidden w-full">
+                <div 
+                  className="h-full rounded-full transition-all duration-500 bg-[#3b82f6]" 
+                  style={{ width: `${pct}%` }}
+                />
               </div>
             </div>
-            <div className="h-2 bg-slate-100 rounded-full overflow-hidden w-full">
-              <div 
-                className="h-full rounded-full transition-all duration-500 bg-[#3b82f6]" 
-                style={{ width: `${pct}%` }}
-              />
-            </div>
-          </div>
-        );
-      })}
+          );
+        })
+      )}
       <div className="border-t border-slate-100 pt-3 mt-1 text-[11px] text-slate-400 font-bold text-left">
         Total de usuarios activos: {total}
       </div>
@@ -438,96 +444,73 @@ const Dashboard = () => {
       setFechaFin(todayStr);
     }
   };
-
-  // Determine whether to use real API data or Fallback Data
-  const hasRealData = dashboardData && dashboardData.resumen_general && dashboardData.resumen_general.total_usuarios > 0;
-  const data = hasRealData ? dashboardData : mockFallbackData;
-
-  // Helper to fallback to mock value if value is null, undefined, or 0
-  const getF = (val, fbVal) => {
-    return (val !== undefined && val !== null && val > 0) ? val : fbVal;
-  };
-
   // Unified display metrics (always populated with real or mock data)
   const displayResumen = {
-    usuarios_activos: getF(data.resumen_general.usuarios_activos, mockFallbackData.resumen_general.usuarios_activos),
-    total_usuarios: getF(data.resumen_general.total_usuarios, mockFallbackData.resumen_general.total_usuarios),
-    jornadas_en_proceso: getF(data.jornadas_dia.jornadas_en_proceso, mockFallbackData.jornadas_dia.jornadas_en_proceso),
-    jornadas_completas: getF(data.jornadas_dia.jornadas_completas, mockFallbackData.jornadas_dia.jornadas_completas),
-    jornadas_ausentes: getF(data.jornadas_dia.jornadas_ausentes, mockFallbackData.jornadas_dia.jornadas_ausentes),
-    tardanzas: getF(data.puntualidad.tardanza, mockFallbackData.puntualidad.tardanza),
-    incidencias_pendientes: getF(data.incidencias.incidencias_pendientes, mockFallbackData.incidencias.incidencias_pendientes),
-    actividades_hoy: getF(data.actividades.actividades_hoy, mockFallbackData.actividades.actividades_hoy),
-    usuarios_fuera_de_zona: getF(data.tracking.usuarios_fuera_de_zona, mockFallbackData.tracking.usuarios_fuera_de_zona),
+    usuarios_activos: dashboardData?.resumen_general?.usuarios_activos ?? 0,
+    total_usuarios: dashboardData?.resumen_general?.total_usuarios ?? 0,
+    jornadas_en_proceso: dashboardData?.jornadas_dia?.jornadas_en_proceso ?? 0,
+    jornadas_completas: dashboardData?.jornadas_dia?.jornadas_completas ?? 0,
+    jornadas_ausentes: dashboardData?.jornadas_dia?.jornadas_ausentes ?? 0,
+    tardanzas: dashboardData?.puntualidad?.tardanza ?? 0,
+    incidencias_pendientes: dashboardData?.incidencias?.incidencias_pendientes ?? 0,
+    actividades_hoy: dashboardData?.actividades?.actividades_hoy ?? 0,
+    usuarios_fuera_de_zona: dashboardData?.tracking?.usuarios_fuera_de_zona ?? 0,
     
     // Bottom details
-    total_actividades: getF(data.actividades.total_actividades, mockFallbackData.actividades.total_actividades),
-    actividades_en_proceso: getF(data.actividades.actividades_en_proceso, mockFallbackData.actividades.actividades_en_proceso),
-    actividades_finalizadas: getF(data.actividades.actividades_finalizadas, mockFallbackData.actividades.actividades_finalizadas),
-    actividades_pendientes: getF(data.actividades.actividades_pendientes, mockFallbackData.actividades.actividades_pendientes),
+    total_actividades: dashboardData?.actividades?.total_actividades ?? 0,
+    actividades_en_proceso: dashboardData?.actividades?.actividades_en_proceso ?? 0,
+    actividades_finalizadas: dashboardData?.actividades?.actividades_finalizadas ?? 0,
+    actividades_pendientes: dashboardData?.actividades?.actividades_pendientes ?? 0,
     
-    usuarios_con_tracking_activo: getF(data.tracking.usuarios_con_tracking_activo, mockFallbackData.tracking.usuarios_con_tracking_activo),
-    total_puntos_gps_hoy: getF(data.tracking.total_puntos_gps_hoy, mockFallbackData.tracking.total_puntos_gps_hoy),
-    en_ruta: getF(data.tracking.en_ruta, mockFallbackData.tracking.en_ruta),
-    detenidos: getF(data.tracking.detenidos, mockFallbackData.tracking.detenidos),
-    sin_senal: getF(data.tracking.sin_senal, mockFallbackData.tracking.sin_senal),
-    fuera_de_zona: getF(data.tracking.fuera_de_zona, mockFallbackData.tracking.fuera_de_zona)
+    usuarios_con_tracking_activo: dashboardData?.tracking?.usuarios_con_tracking_activo ?? 0,
+    total_puntos_gps_hoy: dashboardData?.tracking?.total_puntos_gps_hoy ?? 0,
+    en_ruta: dashboardData?.tracking?.en_ruta ?? 0,
+    detenidos: dashboardData?.tracking?.detenidos ?? 0,
+    sin_senal: dashboardData?.tracking?.sin_senal ?? 0,
+    fuera_de_zona: dashboardData?.tracking?.fuera_de_zona ?? 0
   };
 
   // Dynamic GPS tracking percentages and ratio calculation
   const totalTracked = (displayResumen.en_ruta || 0) + (displayResumen.detenidos || 0) + (displayResumen.sin_senal || 0) + (displayResumen.fuera_de_zona || 0);
-  const enRutaPct = totalTracked > 0 ? Math.round((displayResumen.en_ruta / totalTracked) * 100) : 50;
-  const detenidosPct = totalTracked > 0 ? Math.round((displayResumen.detenidos / totalTracked) * 100) : 25;
-  const sinSenalPct = totalTracked > 0 ? Math.round((displayResumen.sin_senal / totalTracked) * 100) : 8;
-  const fueraZonaPct = totalTracked > 0 ? Math.round((displayResumen.fuera_de_zona / totalTracked) * 100) : 17;
+  const enRutaPct = totalTracked > 0 ? Math.round((displayResumen.en_ruta / totalTracked) * 100) : 0;
+  const detenidosPct = totalTracked > 0 ? Math.round((displayResumen.detenidos / totalTracked) * 100) : 0;
+  const sinSenalPct = totalTracked > 0 ? Math.round((displayResumen.sin_senal / totalTracked) * 100) : 0;
+  const fueraZonaPct = totalTracked > 0 ? Math.round((displayResumen.fuera_de_zona / totalTracked) * 100) : 0;
 
   const trackingRatio = displayResumen.total_usuarios > 0
     ? Math.min(1, displayResumen.usuarios_con_tracking_activo / displayResumen.total_usuarios)
-    : 0.15;
+    : 0;
 
-  const sedesActivas = getF(data.resumen_general.sedes_activas, mockFallbackData.resumen_general.sedes_activas);
-  const totalSedes = getF(data.resumen_general.total_sedes, mockFallbackData.resumen_general.total_sedes);
+  const sedesActivas = dashboardData?.resumen_general?.sedes_activas ?? 0;
+  const totalSedes = dashboardData?.resumen_general?.total_sedes ?? 0;
 
   // Percentages Calculation
-  const realTotalEntradas = data.jornadas_dia.total_entradas_marcadas || 0;
+  const realTotalEntradas = dashboardData?.jornadas_dia?.total_entradas_marcadas || 0;
   const puntualidadPct = realTotalEntradas > 0 
-    ? Math.round(((data.puntualidad.puntual || 0) / realTotalEntradas) * 100) 
-    : 87; // default fallback matching image
+    ? Math.round(((dashboardData?.puntualidad?.puntual || 0) / realTotalEntradas) * 100) 
+    : 0;
 
-  const realTotalJornadas = (data.jornadas_dia.jornadas_completas || 0) + (data.jornadas_dia.jornadas_incompletas || 0) + (data.jornadas_dia.jornadas_ausentes || 0);
+  const realTotalJornadas = (dashboardData?.jornadas_dia?.jornadas_completas || 0) + (dashboardData?.jornadas_dia?.jornadas_incompletas || 0) + (dashboardData?.jornadas_dia?.jornadas_ausentes || 0);
   const cumplimientoPct = realTotalJornadas > 0 
-    ? Math.round(((data.jornadas_dia.jornadas_completas || 0) / realTotalJornadas) * 100) 
-    : 96;
+    ? Math.round(((dashboardData?.jornadas_dia?.jornadas_completas || 0) / realTotalJornadas) * 100) 
+    : 0;
 
   // Chart Mappings
-  const hasPuntualidadData = (data.puntualidad.puntual || 0) + (data.puntualidad.tardanza || 0) + (data.puntualidad.temprano || 0) + (data.puntualidad.no_marco_entrada || 0) > 0;
-  const puntualidadChartData = hasPuntualidadData 
-    ? [
-        { estado: 'Puntual', cantidad: data.puntualidad.puntual || 0, color: '#10b981' },
-        { estado: 'Tardanza', cantidad: data.puntualidad.tardanza || 0, color: '#f59e0b' },
-        { estado: 'Temprano', cantidad: data.puntualidad.temprano || 0, color: '#3b82f6' },
-        { estado: 'No Marcó', cantidad: data.puntualidad.no_marco_entrada || 0, color: '#ef4444' }
-      ]
-    : [
-        { estado: 'Puntual', cantidad: 96, color: '#10b981' },
-        { estado: 'Tardanza', cantidad: 10, color: '#f59e0b' },
-        { estado: 'Temprano', cantidad: 2, color: '#3b82f6' },
-        { estado: 'No Marcó', cantidad: 2, color: '#ef4444' }
-      ];
+  const puntualidadChartData = [
+    { estado: 'Puntual', cantidad: dashboardData?.puntualidad?.puntual || 0, color: '#10b981' },
+    { estado: 'Tardanza', cantidad: dashboardData?.puntualidad?.tardanza || 0, color: '#f59e0b' },
+    { estado: 'Temprano', cantidad: dashboardData?.puntualidad?.temprano || 0, color: '#3b82f6' },
+    { estado: 'No Marcó', cantidad: dashboardData?.puntualidad?.no_marco_entrada || 0, color: '#ef4444' }
+  ];
 
   const incidenciasColors = ['#3b82f6', '#ef4444', '#f59e0b', '#6366f1', '#a78bfa', '#10b981'];
-  const hasIncidenciasData = data.graficos.incidencias_por_tipo && data.graficos.incidencias_por_tipo.length > 0 && data.graficos.incidencias_por_tipo.some(d => d.cantidad > 0);
-  const incidenciasChartData = hasIncidenciasData
-    ? data.graficos.incidencias_por_tipo.map((item, idx) => ({
-        tipo: item.tipo,
-        cantidad: item.cantidad,
-        color: item.color || incidenciasColors[idx % incidenciasColors.length]
-      }))
-    : mockFallbackData.graficos.incidencias_por_tipo;
+  const incidenciasChartData = (dashboardData?.graficos?.incidencias_por_tipo || []).map((item, idx) => ({
+    tipo: item.tipo,
+    cantidad: item.cantidad,
+    color: item.color || incidenciasColors[idx % incidenciasColors.length]
+  }));
 
-  const displayTimeline = data.actividad_reciente && data.actividad_reciente.length > 0
-    ? data.actividad_reciente
-    : mockFallbackData.actividad_reciente;
+  const displayTimeline = dashboardData?.actividad_reciente || [];
 
   return (
     <MainLayout 
@@ -728,7 +711,7 @@ const Dashboard = () => {
               </select>
             </div>
             <div className="flex-1 min-h-0">
-              <LineChart data={data.graficos.asistencia_por_dia_semana || []} />
+              <LineChart data={dashboardData?.graficos?.asistencia_por_dia_semana || []} />
             </div>
           </div>
 
@@ -744,12 +727,6 @@ const Dashboard = () => {
                 data={puntualidadChartData} 
                 centerValue={`${puntualidadPct}%`} 
                 centerLabel="Puntualidad"
-                fallbackData={[
-                  { estado: 'Puntual', cantidad: 96, color: '#10b981' },
-                  { estado: 'Tardanza', cantidad: 10, color: '#f59e0b' },
-                  { estado: 'Temprano', cantidad: 2, color: '#3b82f6' },
-                  { estado: 'No Marcó', cantidad: 2, color: '#ef4444' }
-                ]}
               />
             </div>
             <div className="border-t border-slate-100 pt-3 text-center text-[10px] text-slate-400 font-bold flex items-center justify-center gap-1.5 mt-auto">
@@ -766,8 +743,7 @@ const Dashboard = () => {
             </div>
             <div className="flex-1 overflow-y-auto pr-1">
               <HorizontalBarChart 
-                data={data.graficos.usuarios_por_sede || []} 
-                fallbackData={mockFallbackData.graficos.usuarios_por_sede}
+                data={dashboardData?.graficos?.usuarios_por_sede || []} 
               />
             </div>
           </div>
@@ -785,9 +761,8 @@ const Dashboard = () => {
             <div className="flex-1 flex items-center justify-center">
               <DonutChart 
                 data={incidenciasChartData} 
-                centerValue={`${getF(data.incidencias.total_incidencias_hoy, mockFallbackData.incidencias.total_incidencias_hoy)}`} 
+                centerValue={`${dashboardData?.incidencias?.total_incidencias_hoy ?? 0}`} 
                 centerLabel="Total" 
-                fallbackData={mockFallbackData.graficos.incidencias_por_tipo}
               />
             </div>
           </div>

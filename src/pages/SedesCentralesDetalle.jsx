@@ -25,7 +25,7 @@ const SedesCentralesDetalle = () => {
   const fetchDetalle = async () => {
     const token = localStorage.getItem('access_token');
     try {
-      const res = await fetch(`${API_URL}/sedes-centrales/${id}/`, {
+      const res = await fetch(`${API_URL}/sedes-centrales/${id}/?_t=${Date.now()}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {
@@ -51,7 +51,7 @@ const SedesCentralesDetalle = () => {
     setLoadingDisponibles(true);
     const token = localStorage.getItem('access_token');
     try {
-      const res = await fetch(`${API_URL}/sedes/disponibles-para-central/`, {
+      const res = await fetch(`${API_URL}/sedes/disponibles-para-central/?_t=${Date.now()}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {
