@@ -367,13 +367,31 @@ const HorizontalBarChart = ({ data = [] }) => {
 const Dashboard = () => {
   const navigate = useNavigate();
   const [rango, setRango] = useState('hoy');
+  const [selectedSedeCentral, setSelectedSedeCentral] = useState('');
   const [selectedSede, setSelectedSede] = useState('');
   const [selectedRol, setSelectedRol] = useState('');
   const [fechaInicio, setFechaInicio] = useState('');
   const [fechaFin, setFechaFin] = useState('');
+  const [sedesCentralesList, setSedesCentralesList] = useState([]);
   const [sedesList, setSedesList] = useState([]);
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  const fetchSedesCentrales = useCallback(async () => {
+    const token = localStorage.getItem('access_token');
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_URL}/sedes-centrales/`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSedesCentralesList(Array.isArray(data) ? data.filter(sc => sc.estado) : []);
+      }
+    } catch (err) {
+      console.error('Error fetching sedes centrales:', err);
+    }
+  }, []);
 
   const fetchSedes = useCallback(async () => {
     const token = localStorage.getItem('access_token');
@@ -391,7 +409,7 @@ const Dashboard = () => {
     }
   }, []);
 
-  const fetchDashboardData = useCallback(async (currentRango, currentSede, currentRol, start, end) => {
+  const fetchDashboardData = useCallback(async (currentRango, currentSedeCentral, currentSede, currentRol, start, end) => {
     const token = localStorage.getItem('access_token');
     if (!token) {
       navigate('/login');
@@ -401,7 +419,7 @@ const Dashboard = () => {
     setLoading(true);
     try {
       const headers = { Authorization: `Bearer ${token}` };
-      let url = `${API_URL}/dashboard/resumen/?rango=${currentRango}&sede=${currentSede || ''}&rol=${currentRol || ''}`;
+      let url = `${API_URL}/dashboard/resumen/?rango=${currentRango}&sede_central=${currentSedeCentral || ''}&sede=${currentSede || ''}&rol=${currentRol || ''}`;
       if (currentRango === 'personalizado' && start && end) {
         url += `&fecha_inicio=${start}&fecha_fin=${end}`;
       }
@@ -421,20 +439,25 @@ const Dashboard = () => {
   }, [navigate]);
 
   useWebSockets((data) => {
-    if (data.type === 'attendance_update' || data.type === 'incident_update') {
-      fetchDashboardData(rango, selectedSede, selectedRol, fechaInicio, fechaFin);
+    if (
+      data.notification_type === 'attendance_update' || 
+      data.notification_type === 'incident_update' || 
+      data.notification_type === 'config_update'
+    ) {
+      fetchDashboardData(rango, selectedSedeCentral, selectedSede, selectedRol, fechaInicio, fechaFin);
     }
   });
 
   useEffect(() => {
+    fetchSedesCentrales();
     fetchSedes();
-  }, [fetchSedes]);
+  }, [fetchSedesCentrales, fetchSedes]);
 
   useEffect(() => {
     if (rango !== 'personalizado' || (fechaInicio && fechaFin)) {
-      fetchDashboardData(rango, selectedSede, selectedRol, fechaInicio, fechaFin);
+      fetchDashboardData(rango, selectedSedeCentral, selectedSede, selectedRol, fechaInicio, fechaFin);
     }
-  }, [rango, selectedSede, selectedRol, fechaInicio, fechaFin, fetchDashboardData]);
+  }, [rango, selectedSedeCentral, selectedSede, selectedRol, fechaInicio, fechaFin, fetchDashboardData]);
 
   const handleRangeChange = (newRango) => {
     setRango(newRango);
@@ -512,6 +535,10 @@ const Dashboard = () => {
 
   const displayTimeline = dashboardData?.actividad_reciente || [];
 
+  const filteredSedesList = selectedSedeCentral
+    ? sedesList.filter(s => s.sede_central === parseInt(selectedSedeCentral))
+    : sedesList;
+
   return (
     <MainLayout 
       title="Panel de Control" 
@@ -524,16 +551,34 @@ const Dashboard = () => {
           <span className="text-xs font-bold text-slate-400 uppercase tracking-wide">Filtros Operativos</span>
           
           <div className="flex flex-wrap gap-3.5 items-center">
-            {/* Sede Select */}
+            {/* Sede Central Select */}
             <div className="flex items-center gap-2">
-              <label className="text-xs font-bold text-slate-500">Sede:</label>
+              <label className="text-xs font-bold text-slate-500">Sede Central:</label>
+              <select 
+                className="text-xs font-semibold text-slate-700 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 outline-none cursor-pointer focus:border-sky-500 transition" 
+                value={selectedSedeCentral} 
+                onChange={(e) => {
+                  setSelectedSedeCentral(e.target.value);
+                  setSelectedSede('');
+                }}
+              >
+                <option value="">Todas las Sedes Centrales</option>
+                {sedesCentralesList.map(sc => (
+                  <option key={sc.id} value={sc.id}>{sc.nombre}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Sede Operativa Select */}
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-bold text-slate-500">Sede Operativa:</label>
               <select 
                 className="text-xs font-semibold text-slate-700 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 outline-none cursor-pointer focus:border-sky-500 transition" 
                 value={selectedSede} 
                 onChange={(e) => setSelectedSede(e.target.value)}
               >
-                <option value="">Todas las Sedes</option>
-                {sedesList.map(s => (
+                <option value="">Todas las Operativas</option>
+                {filteredSedesList.map(s => (
                   <option key={s.id} value={s.id}>{s.nombre}</option>
                 ))}
               </select>
@@ -749,26 +794,10 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Bottom Grid Layout (Incidencias, Actividades, Actividad Reciente, Estado de Operación) */}
+        {/* Bottom Grid Layout (Actividades, Actividad Reciente, Estado de Operación) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-6 w-full">
-          {/* Card 1: Incidencias por Tipo */}
-          <div className="lg:col-span-3 bg-white border border-slate-100 shadow-sm rounded-2xl p-5 flex flex-col h-[290px]">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-2">
-              <h2 className="text-xs font-bold text-slate-800 flex items-center gap-2 uppercase tracking-wide">
-                <AlertTriangle className="w-4 h-4 text-sky-500" /> Incidencias por Tipo
-              </h2>
-            </div>
-            <div className="flex-1 flex items-center justify-center">
-              <DonutChart 
-                data={incidenciasChartData} 
-                centerValue={`${dashboardData?.incidencias?.total_incidencias_hoy ?? 0}`} 
-                centerLabel="Total" 
-              />
-            </div>
-          </div>
-
           {/* Card 2: Actividades de Campo */}
-          <div className="lg:col-span-2 bg-white border border-slate-100 shadow-sm rounded-2xl p-5 flex flex-col h-[290px]">
+          <div className="lg:col-span-3 bg-white border border-slate-100 shadow-sm rounded-2xl p-5 flex flex-col h-[290px]">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
               <h2 className="text-xs font-bold text-slate-800 flex items-center gap-2 uppercase tracking-wide">
                 <FileText className="w-4 h-4 text-sky-500" /> Actividades
@@ -794,7 +823,7 @@ const Dashboard = () => {
           </div>
 
           {/* Card 3: Actividad Reciente */}
-          <div className="lg:col-span-4 bg-white border border-slate-100 shadow-sm rounded-2xl p-5 flex flex-col h-[290px]">
+          <div className="lg:col-span-5 bg-white border border-slate-100 shadow-sm rounded-2xl p-5 flex flex-col h-[290px]">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
               <h2 className="text-xs font-bold text-slate-800 flex items-center gap-2 uppercase tracking-wide">
                 <Activity className="w-4 h-4 text-sky-500" /> Actividad Reciente
@@ -827,7 +856,7 @@ const Dashboard = () => {
           </div>
 
           {/* Card 4: Estado de Operación */}
-          <div className="lg:col-span-3 bg-white border border-slate-100 shadow-sm rounded-2xl p-5 flex flex-col h-[290px]">
+          <div className="lg:col-span-4 bg-white border border-slate-100 shadow-sm rounded-2xl p-5 flex flex-col h-[290px]">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
               <h2 className="text-xs font-bold text-slate-800 flex items-center gap-2 uppercase tracking-wide">
                 <TrendingUp className="w-4 h-4 text-sky-500" /> Estado de Operación
