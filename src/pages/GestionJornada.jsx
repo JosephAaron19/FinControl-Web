@@ -39,7 +39,8 @@ import MainLayout from '../layouts/MainLayout';
 import { useNotification } from '../context/NotificationContext';
 import './GestionJornada.css';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
+// const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
+const API_URL = import.meta.env.VITE_API_URL || 'https://apifincontrol.finatech.com.pe/api';
 
 const getLocalDateString = () => {
   const d = new Date();
@@ -229,7 +230,7 @@ const GestionJornada = () => {
       if (res.ok) {
         const data = await res.json();
         setSedesResumen(data);
-        
+
         // Expand all by default
         const initialExpanded = {};
         data.forEach(c => {
@@ -979,15 +980,15 @@ const GestionJornada = () => {
                 // Filtro: buscar en central o en sus sedes
                 const search = sedeCentralSearchTerm.toLowerCase();
                 const matchesCentral = central.nombre?.toLowerCase().includes(search);
-                const sedesFiltradas = central.sedes?.filter(s => 
-                  s.sede_nombre?.toLowerCase().includes(search) || 
+                const sedesFiltradas = central.sedes?.filter(s =>
+                  s.sede_nombre?.toLowerCase().includes(search) ||
                   s.direccion?.toLowerCase().includes(search)
                 ) || [];
-                
+
                 if (search && !matchesCentral && sedesFiltradas.length === 0) {
                   return null; // Ocultar si no coincide ni la central ni sus sedes
                 }
-                
+
                 const sedesAMostrar = search && !matchesCentral ? sedesFiltradas : central.sedes;
                 const centralIdKey = central.id || 'sin_asignar';
                 const isExpanded = expandedCentrales[centralIdKey];
@@ -995,7 +996,7 @@ const GestionJornada = () => {
                 return (
                   <div key={centralIdKey} className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
                     {/* Cabecera de la Sede Central */}
-                    <div 
+                    <div
                       className="px-6 py-4 flex items-center justify-between cursor-pointer hover:bg-slate-50 transition"
                       onClick={() => setExpandedCentrales(prev => ({ ...prev, [centralIdKey]: !isExpanded }))}
                     >
@@ -1070,7 +1071,7 @@ const GestionJornada = () => {
                   </div>
                 );
               })}
-              
+
               {/* Mensaje de no resultados */}
               {sedesResumen.length > 0 && sedeCentralSearchTerm && !sedesResumen.some(central => {
                 const search = sedeCentralSearchTerm.toLowerCase();
@@ -1078,11 +1079,11 @@ const GestionJornada = () => {
                 const sedesFiltradas = central.sedes?.filter(s => s.sede_nombre?.toLowerCase().includes(search) || s.direccion?.toLowerCase().includes(search)) || [];
                 return matchesCentral || sedesFiltradas.length > 0;
               }) && (
-                <div className="text-center py-12 bg-slate-50 rounded-xl border border-dashed border-slate-200">
-                  <Search size={32} className="mx-auto text-slate-300 mb-3" />
-                  <p className="text-slate-500 font-medium">No se encontraron sedes relacionadas con "{sedeCentralSearchTerm}".</p>
-                </div>
-              )}
+                  <div className="text-center py-12 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                    <Search size={32} className="mx-auto text-slate-300 mb-3" />
+                    <p className="text-slate-500 font-medium">No se encontraron sedes relacionadas con "{sedeCentralSearchTerm}".</p>
+                  </div>
+                )}
             </div>
           )}
         </div>

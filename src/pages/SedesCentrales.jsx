@@ -7,7 +7,8 @@ import './Sedes.css'; // Reusing Sedes.css for styling
 import bannerImg from '../assets/modern_office_buildings_banner.png';
 import placeholderImg from '../assets/modern_office_building_placeholder.png';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
+//const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
+const API_URL = import.meta.env.VITE_API_URL || 'https://apifincontrol.finatech.com.pe/api';
 
 const SedesCentrales = () => {
   const navigate = useNavigate();
@@ -222,7 +223,7 @@ const SedesCentrales = () => {
       subtitle="Gestiona los agrupadores principales de sedes."
     >
       <div className="flex flex-col gap-6 w-full animate-in select-none">
-        
+
         {/* Banner Superior */}
         <div className="relative bg-gradient-to-r from-blue-50 via-sky-50 to-white border border-slate-100 rounded-3xl p-6 md:p-8 flex flex-col md:flex-row items-center justify-between overflow-hidden shadow-sm">
           <div className="flex items-center gap-6 max-w-xl text-left">
@@ -322,16 +323,16 @@ const SedesCentrales = () => {
           ) : (
             filteredList.map(sede => (
               <div key={sede.id} className="relative bg-white border border-slate-100 shadow-sm hover:shadow-md hover:border-slate-200 rounded-3xl p-5 flex flex-col md:flex-row gap-6 items-stretch transition duration-200 overflow-hidden">
-                
+
                 {/* Acento lateral */}
                 <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-blue-500 rounded-l-3xl" />
-                
+
                 {/* Imagen izquierda */}
                 <div className="w-full md:w-60 h-44 rounded-2xl overflow-hidden flex-shrink-0 bg-slate-50 border border-slate-100 shadow-inner flex items-center justify-center relative">
-                  <img 
-                    src={sede.imagen_completa_url || placeholderImg} 
-                    alt={sede.nombre} 
-                    className="w-full h-full object-cover" 
+                  <img
+                    src={sede.imagen_completa_url || placeholderImg}
+                    alt={sede.nombre}
+                    className="w-full h-full object-cover"
                     onError={(e) => { e.target.src = placeholderImg; }}
                   />
                 </div>
@@ -341,13 +342,12 @@ const SedesCentrales = () => {
                   <div>
                     {/* Fila de Badge y Acciones */}
                     <div className="flex justify-between items-start gap-4">
-                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                        sede.estado ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'
-                      }`}>
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${sede.estado ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'
+                        }`}>
                         <span className={`w-1.5 h-1.5 rounded-full ${sede.estado ? 'bg-emerald-500' : 'bg-rose-500'}`} />
                         {sede.estado ? 'ACTIVO' : 'INACTIVO'}
                       </span>
-                      
+
                       {/* Acciones */}
                       <div className="flex items-center gap-1.5">
                         <button
@@ -396,7 +396,7 @@ const SedesCentrales = () => {
                           </span>
                         ))}
                         {sede.sedes.length > 3 && (
-                          <button 
+                          <button
                             onClick={() => navigate(`/sedes-centrales/${sede.id}`)}
                             className="inline-flex items-center px-3 py-1 rounded-xl text-[9px] font-bold bg-blue-50 text-blue-600 hover:bg-blue-100 transition border border-blue-100"
                           >
@@ -486,18 +486,16 @@ const SedesCentrales = () => {
                     <button
                       type="button"
                       onClick={() => setImageSourceType('url')}
-                      className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg transition ${
-                        imageSourceType === 'url' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-800'
-                      }`}
+                      className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg transition ${imageSourceType === 'url' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-800'
+                        }`}
                     >
                       Enlace URL
                     </button>
                     <button
                       type="button"
                       onClick={() => setImageSourceType('file')}
-                      className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg transition ${
-                        imageSourceType === 'file' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-800'
-                      }`}
+                      className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg transition ${imageSourceType === 'file' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-800'
+                        }`}
                     >
                       Archivo Local
                     </button>
@@ -544,9 +542,9 @@ const SedesCentrales = () => {
                 {/* Vista previa de imagen adaptiva */}
                 {getModalImagePreview() && (
                   <div className="mt-1 rounded-2xl overflow-hidden border border-slate-200 h-44 bg-slate-100 flex items-center justify-center relative shadow-inner">
-                    <img 
-                      src={getModalImagePreview()} 
-                      alt="Vista previa" 
+                    <img
+                      src={getModalImagePreview()}
+                      alt="Vista previa"
                       className="max-w-full max-h-full object-contain"
                       onError={(e) => { e.target.style.display = 'none'; }}
                     />

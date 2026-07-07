@@ -20,7 +20,8 @@ import MainLayout from '../layouts/MainLayout';
 import useWebSockets from '../hooks/useWebSockets';
 import './Actividad.css';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
+// const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
+const API_URL = import.meta.env.VITE_API_URL || 'https://apifincontrol.finatech.com.pe/api';
 
 const getInitials = (name) => {
   if (!name) return 'U';
@@ -65,25 +66,25 @@ const CustomSelect = ({ value, onChange, options, placeholder, icon: Icon, disab
 
   return (
     <div className={`custom-select-wrapper-monitoreo ${disabled ? 'opacity-50 pointer-events-none' : ''}`} ref={selectRef}>
-      <div 
-        className={`filter-pill-select-wrapper-monitoreo custom-select-trigger ${isOpen ? 'active' : ''}`} 
+      <div
+        className={`filter-pill-select-wrapper-monitoreo custom-select-trigger ${isOpen ? 'active' : ''}`}
         onClick={() => !disabled && setIsOpen(!isOpen)}
       >
         <Icon size={15} className="filter-pill-icon-blue" />
         <span className="custom-select-text">{selectedLabel}</span>
         <ChevronDown size={14} className={`filter-pill-chevron transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </div>
-      
+
       {isOpen && (
         <div className="custom-select-dropdown">
-          <div 
+          <div
             className={`custom-select-option ${!value ? 'selected' : ''}`}
             onClick={() => { onChange(''); setIsOpen(false); }}
           >
             {placeholder}
           </div>
           {options.map((opt, idx) => (
-            <div 
+            <div
               key={idx}
               className={`custom-select-option ${value === opt ? 'selected' : ''}`}
               onClick={() => { onChange(opt); setIsOpen(false); }}
@@ -181,26 +182,26 @@ const Actividad = () => {
   const filteredActividades = actividades.filter(a => {
     const nameMatch = (a.nombre_completo || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (a.dni || '').toLowerCase().includes(searchTerm.toLowerCase());
-      
+
     const centralName = a.sede_info?.sede_central_nombre || 'Sin asignar';
     const centralMatch = !selectedCentral || centralName === selectedCentral;
-    
+
     const sedeMatch = !selectedSede || a.sede === selectedSede;
-    
+
     const rolName = (a.rol_info?.nombre || a.cargo || '').toUpperCase();
     const rolMatch = !selectedRol || rolName === selectedRol;
-    
+
     return nameMatch && centralMatch && sedeMatch && rolMatch;
   });
 
   // Listas de opciones únicas para los filtros en cascada
   const uniqueCentrales = Array.from(new Set(actividades.map(a => a.sede_info?.sede_central_nombre || 'Sin asignar'))).sort();
-  
+
   const uniqueSedes = Array.from(new Set(actividades
     .filter(a => !selectedCentral || (a.sede_info?.sede_central_nombre || 'Sin asignar') === selectedCentral)
     .map(a => a.sede)
     .filter(Boolean))).sort();
-    
+
   const uniqueRoles = Array.from(new Set(actividades
     .filter(a => !selectedCentral || (a.sede_info?.sede_central_nombre || 'Sin asignar') === selectedCentral)
     .filter(a => !selectedSede || a.sede === selectedSede)

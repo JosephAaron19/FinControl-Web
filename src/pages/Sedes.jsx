@@ -29,7 +29,8 @@ import MainLayout from '../layouts/MainLayout';
 import { useNotification } from '../context/NotificationContext';
 import './Sedes.css';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
+//const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
+const API_URL = import.meta.env.VITE_API_URL || 'https://apifincontrol.finatech.com.pe/api';
 
 const darkMapStyle = [
   { elementType: 'geometry', stylers: [{ color: '#0f172a' }] },
